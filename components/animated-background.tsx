@@ -1,17 +1,12 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import type { EnhancedBox, DepthLayer } from "./animated-background/types"
+import { createParticle } from "./animated-background/utils"
+import { ANIMATION_CONFIG } from "./animated-background/constants"
 
-interface Box {
-  id: number
-  x: number
-  y: number
-  size: number
-  vx: number
-  vy: number
-  opacity: number
-  color: string
-}
+// Legacy type alias for backward compatibility during migration
+type Box = EnhancedBox
 
 export function AnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -61,36 +56,45 @@ export function AnimatedBackground() {
     }
     setCanvasSize()
 
-    // Detect mobile for optimization
+    // Phase 2: Use configuration-driven particle counts
     const isMobile = /Android|webOS|iPhone|iPad/i.test(navigator.userAgent)
-    const boxCount = isMobile ? 20 : 35
+    const boxCount = isMobile
+      ? ANIMATION_CONFIG.particleCounts.mobile    // 15 particles
+      : ANIMATION_CONFIG.particleCounts.desktop   // 30 particles
 
-    // Initialize boxes with Box Battle color scheme
+    // Phase 2: Initialize boxes with depth layering system
     const initializeBoxes = () => {
-      // Box Battle colors: blues and reds (like completed game boxes)
-      const colors = [
-        "#3b82f6", // blue
-        "#60a5fa", // light blue
-        "#2563eb", // dark blue
-        "#1e40af", // darker blue
-        "#ef4444", // red
-        "#f87171", // light red
-        "#dc2626", // darker red
-      ]
+      // Calculate layer distribution (40% far, 40% mid, 20% near)
+      const farCount = Math.floor(boxCount * ANIMATION_CONFIG.depthLayers.far.count)
+      const midCount = Math.floor(boxCount * ANIMATION_CONFIG.depthLayers.mid.count)
+      const nearCount = boxCount - farCount - midCount  // Remainder goes to near layer
 
-      boxesRef.current = Array.from({ length: boxCount }, (_, i) => ({
-        id: i,
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        size: Math.random() * 30 + 20, // 20-50px
-        // Phase 1: Changed from px/frame to px/second for refresh-rate independence
-        // Old: (Math.random() - 0.5) * 0.5 = -0.25 to +0.25 px/frame
-        // New: (Math.random() - 0.5) * 30 = -15 to +15 px/sec (same visual speed at 60fps)
-        vx: (Math.random() - 0.5) * 30, // -15 to +15 px/sec
-        vy: (Math.random() - 0.5) * 30, // -15 to +15 px/sec
-        opacity: Math.random() * 0.3 + 0.1, // 0.1-0.4 base opacity
-        color: colors[Math.floor(Math.random() * colors.length)],
-      }))
+      const boxes: EnhancedBox[] = []
+      let id = 0
+
+      // Create far layer particles (40%)
+      for (let i = 0; i < farCount; i++) {
+        boxes.push(createParticle(id++, 'far'))
+      }
+
+      // Create mid layer particles (40%)
+      for (let i = 0; i < midCount; i++) {
+        boxes.push(createParticle(id++, 'mid'))
+      }
+
+      // Create near layer particles (20%)
+      for (let i = 0; i < nearCount; i++) {
+        boxes.push(createParticle(id++, 'near'))
+      }
+
+      boxesRef.current = boxes
+
+      console.log('[AnimatedBackground] Layer distribution:', {
+        total: boxes.length,
+        far: farCount,
+        mid: midCount,
+        near: nearCount,
+      })
     }
     initializeBoxes()
     console.log('[AnimatedBackground] Initialized', boxesRef.current.length, 'boxes')
@@ -100,13 +104,15 @@ export function AnimatedBackground() {
       mouseRef.current = { x: e.clientX, y: e.clientY }
     }
 
-    // Draw a box with rounded corners and glow effect
+    // Phase 2: Draw a box with depth-aware blur and glow effect
     const drawBox = (box: Box, opacity: number) => {
-      const { x, y, size, color } = box
+      const { x, y, size, color, depth } = box
       const borderRadius = 6 // Rounded corners
 
-      // Add glow effect
-      ctx.shadowBlur = 15
+      // Phase 2: Layer-specific blur for depth perception
+      // Far layer: 20px (very soft), Mid: 15px (medium), Near: 10px (sharp)
+      const layerBlur = ANIMATION_CONFIG.depthLayers[depth].blurAmount
+      ctx.shadowBlur = layerBlur
       ctx.shadowColor = color
 
       // Draw filled rounded rectangle
@@ -173,7 +179,11 @@ export function AnimatedBackground() {
 
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight)
 
-      boxesRef.current.forEach((box) => {
+      // Phase 2: Sort boxes by zIndex for correct depth rendering (far → mid → near)
+      // This ensures background particles render first, foreground particles last
+      const sortedBoxes = [...boxesRef.current].sort((a, b) => a.zIndex - b.zIndex)
+
+      sortedBoxes.forEach((box) => {
         // Phase 1: Update position with delta time (pixels per second * seconds)
         box.x += box.vx * deltaTime
         box.y += box.vy * deltaTime
@@ -191,18 +201,24 @@ export function AnimatedBackground() {
         const dy = mouseRef.current.y - (box.y + box.size / 2)
         const distance = Math.sqrt(dx * dx + dy * dy)
 
-        // Proximity effect
-        let opacity = box.opacity
-        if (distance < 150) {
+        // Phase 2: Proximity effect with parallax
+        let opacity = box.baseOpacity  // Use baseOpacity from layer config
+        if (distance < ANIMATION_CONFIG.interaction.proximityRadius) {
           // Increase opacity when mouse is near
-          opacity = Math.min(0.8, box.opacity + (1 - distance / 150) * 0.7)
+          const proximityFactor = 1 - distance / ANIMATION_CONFIG.interaction.proximityRadius
+          opacity = Math.min(
+            ANIMATION_CONFIG.interaction.maxProximityOpacity,
+            box.baseOpacity + proximityFactor * 0.7
+          )
 
-          // Phase 1: Repel from mouse with delta time
-          // Force of 120 px/sec (was 2 px/frame at 60fps)
-          const repulsionForce = 120
-          const angle = Math.atan2(dy, dx)
-          box.x += Math.cos(angle) * repulsionForce * deltaTime
-          box.y += Math.sin(angle) * repulsionForce * deltaTime
+          // Phase 2: Parallax mouse repulsion (layer-dependent)
+          // Each layer responds differently to mouse (far=0.3x, mid=1.0x, near=1.7x)
+          const layerConfig = ANIMATION_CONFIG.depthLayers[box.depth]
+          const baseRepulsion = ANIMATION_CONFIG.physics.mouseRepulsionStrength
+          const parallaxRepulsion = baseRepulsion * layerConfig.parallaxFactor
+          const angle = Math.atan2(-dy, -dx)  // Angle away from mouse
+          box.x += Math.cos(angle) * parallaxRepulsion * deltaTime
+          box.y += Math.sin(angle) * parallaxRepulsion * deltaTime
         }
 
         // Draw the box
