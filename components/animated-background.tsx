@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import type { EnhancedBox, DepthLayer } from "./animated-background/types"
-import { createParticle } from "./animated-background/utils"
+import { createParticle, createCanvasGradient } from "./animated-background/utils"
 import { ANIMATION_CONFIG } from "./animated-background/constants"
 
 // Legacy type alias for backward compatibility during migration
@@ -104,19 +104,45 @@ export function AnimatedBackground() {
       mouseRef.current = { x: e.clientX, y: e.clientY }
     }
 
-    // Phase 2: Draw a box with depth-aware blur and glow effect
+    // Phase 3: Draw a box with glassmorphic radial gradient
     const drawBox = (box: Box, opacity: number) => {
-      const { x, y, size, color, depth } = box
+      const { x, y, size, color, depth, rotation, scale } = box
       const borderRadius = 6 // Rounded corners
 
       // Phase 2: Layer-specific blur for depth perception
-      // Far layer: 20px (very soft), Mid: 15px (medium), Near: 10px (sharp)
       const layerBlur = ANIMATION_CONFIG.depthLayers[depth].blurAmount
       ctx.shadowBlur = layerBlur
       ctx.shadowColor = color
 
-      // Draw filled rounded rectangle
-      ctx.fillStyle = color
+      // Phase 3: Apply rotation and scaling transforms
+      ctx.save()
+      const centerX = x + size / 2
+      const centerY = y + size / 2
+      ctx.translate(centerX, centerY)
+      ctx.rotate(rotation)
+      ctx.scale(scale, scale)
+      ctx.translate(-centerX, -centerY)
+
+      // Phase 3: Create or use cached radial gradient
+      if (!box.cachedGradient || box.gradientNeedsUpdate) {
+        // Create radial gradient from center of particle
+        const gradientCenterX = x + box.gradientCenter.x
+        const gradientCenterY = y + box.gradientCenter.y
+        const gradientRadius = box.gradientRadius
+
+        box.cachedGradient = createCanvasGradient(
+          ctx,
+          gradientCenterX,
+          gradientCenterY,
+          gradientRadius,
+          box.gradientStops,
+          color
+        )
+        box.gradientNeedsUpdate = false
+      }
+
+      // Draw filled rounded rectangle with gradient
+      ctx.fillStyle = box.cachedGradient
       ctx.globalAlpha = opacity
       ctx.beginPath()
       ctx.roundRect(x, y, size, size, borderRadius)
@@ -125,13 +151,16 @@ export function AnimatedBackground() {
       // Reset shadow for border
       ctx.shadowBlur = 0
 
-      // Draw border
+      // Draw border (optional, subtle)
       ctx.strokeStyle = color
       ctx.lineWidth = 1.5
-      ctx.globalAlpha = opacity * 0.6
+      ctx.globalAlpha = opacity * 0.4  // More subtle border for glass effect
       ctx.beginPath()
       ctx.roundRect(x, y, size, size, borderRadius)
       ctx.stroke()
+
+      // Restore transform
+      ctx.restore()
     }
 
     // Track visibility for pausing animation when tab is hidden
@@ -188,6 +217,12 @@ export function AnimatedBackground() {
         box.x += box.vx * deltaTime
         box.y += box.vy * deltaTime
 
+        // Phase 3: Update rotation with delta time
+        box.rotation += box.rotationSpeed * deltaTime
+        // Normalize rotation to 0-2π range
+        if (box.rotation > Math.PI * 2) box.rotation -= Math.PI * 2
+        if (box.rotation < 0) box.rotation += Math.PI * 2
+
         // Bounce off walls with energy loss (0.8 = retain 80% of velocity)
         if (box.x < 0 || box.x + box.size > window.innerWidth) box.vx *= -0.8
         if (box.y < 0 || box.y + box.size > window.innerHeight) box.vy *= -0.8
@@ -201,15 +236,19 @@ export function AnimatedBackground() {
         const dy = mouseRef.current.y - (box.y + box.size / 2)
         const distance = Math.sqrt(dx * dx + dy * dy)
 
-        // Phase 2: Proximity effect with parallax
+        // Phase 2-3: Proximity effect with parallax and scaling
         let opacity = box.baseOpacity  // Use baseOpacity from layer config
         if (distance < ANIMATION_CONFIG.interaction.proximityRadius) {
           // Increase opacity when mouse is near
           const proximityFactor = 1 - distance / ANIMATION_CONFIG.interaction.proximityRadius
           opacity = Math.min(
-            ANIMATION_CONFIG.interaction.maxProximityOpacity,
+            ANIMATION_CONFIG.interaction.opacityBoostMax,
             box.baseOpacity + proximityFactor * 0.7
           )
+
+          // Phase 3: Proximity scaling (particles grow when mouse is near)
+          const maxScale = ANIMATION_CONFIG.interaction.pulseScale.max
+          box.targetScale = 1 + proximityFactor * (maxScale - 1)
 
           // Phase 2: Parallax mouse repulsion (layer-dependent)
           // Each layer responds differently to mouse (far=0.3x, mid=1.0x, near=1.7x)
@@ -219,7 +258,14 @@ export function AnimatedBackground() {
           const angle = Math.atan2(-dy, -dx)  // Angle away from mouse
           box.x += Math.cos(angle) * parallaxRepulsion * deltaTime
           box.y += Math.sin(angle) * parallaxRepulsion * deltaTime
+        } else {
+          // Far from mouse: return to normal scale
+          box.targetScale = 1.0
         }
+
+        // Phase 3: Smooth scale interpolation (lerp)
+        const scaleSpeed = 5.0 // How fast scale changes (higher = faster)
+        box.scale += (box.targetScale - box.scale) * scaleSpeed * deltaTime
 
         // Draw the box
         drawBox(box, opacity)
