@@ -85,10 +85,18 @@ export function useGameCounter() {
   })
 }
 
+// Error callback type
+type ErrorCallback = (message: string) => void
+
 // Write functions
-export function useCreateGame() {
+export function useCreateGame(onErrorCallback?: ErrorCallback) {
   const { data: entryFee, isLoading: isLoadingFee, error: feeError } = useEntryFee()
   const { writeContract, data: hash, ...rest } = useWriteContract()
+
+  const showError = (msg: string) => {
+    if (onErrorCallback) onErrorCallback(msg)
+    else console.error(msg)
+  }
 
   const createGame = () => {
     console.log('[CreateGame] Button clicked')
@@ -99,7 +107,7 @@ export function useCreateGame() {
 
     if (!entryFee) {
       console.error('[CreateGame] Entry fee not loaded yet. Cannot create game.')
-      alert('⚠️ Entry fee not loaded. Please refresh the page.')
+      showError('Entry fee not loaded. Please refresh the page.')
       return
     }
 
@@ -118,13 +126,13 @@ export function useCreateGame() {
           },
           onError: (error) => {
             console.error('[CreateGame] Transaction error:', error)
-            alert(`❌ Transaction failed: ${error.message}`)
+            showError(`Transaction failed: ${error.message}`)
           },
         }
       )
     } catch (error) {
       console.error('[CreateGame] writeContract threw error:', error)
-      alert(`❌ Error: ${error}`)
+      showError(`Error: ${error}`)
     }
   }
 
@@ -137,9 +145,14 @@ export function useCreateGame() {
   }
 }
 
-export function useJoinGame() {
+export function useJoinGame(onErrorCallback?: ErrorCallback) {
   const { data: entryFee, isLoading: isLoadingFee, error: feeError } = useEntryFee()
   const { writeContract, data: hash, ...rest } = useWriteContract()
+
+  const showError = (msg: string) => {
+    if (onErrorCallback) onErrorCallback(msg)
+    else console.error(msg)
+  }
 
   const joinGame = (gameId: bigint) => {
     console.log('[JoinGame Hook] Called with gameId:', gameId)
@@ -149,7 +162,7 @@ export function useJoinGame() {
 
     if (!entryFee) {
       console.error('[JoinGame Hook] Entry fee not loaded!')
-      alert('⚠️ Entry fee not loaded. Please wait and try again.')
+      showError('Entry fee not loaded. Please wait and try again.')
       return
     }
 
@@ -173,22 +186,22 @@ export function useJoinGame() {
             // Parse common contract errors
             const errorMsg = error.message || String(error)
             if (errorMsg.includes('GameNotWaiting')) {
-              alert('❌ This game is not available to join. It may have already started or ended.')
+              showError('This game is not available to join. It may have already started or ended.')
             } else if (errorMsg.includes('CannotJoinOwnGame')) {
-              alert('❌ You cannot join your own game!')
+              showError('You cannot join your own game!')
             } else if (errorMsg.includes('WrongEntryFee')) {
-              alert('❌ Wrong entry fee amount.')
+              showError('Wrong entry fee amount.')
             } else if (errorMsg.includes('intrinsic gas too low') || errorMsg.includes('gas required exceeds')) {
-              alert('❌ Transaction would fail. The game may not exist, already started, or is your own game.')
+              showError('Transaction would fail. The game may not exist, already started, or is your own game.')
             } else {
-              alert(`❌ Failed to join game: ${errorMsg.slice(0, 100)}`)
+              showError(`Failed to join game: ${errorMsg.slice(0, 100)}`)
             }
           },
         }
       )
     } catch (error) {
       console.error('[JoinGame Hook] ❌ writeContract threw error:', error)
-      alert(`❌ Error: ${error}`)
+      showError(`Error: ${error}`)
     }
   }
 
@@ -201,8 +214,13 @@ export function useJoinGame() {
   }
 }
 
-export function usePlaceLine() {
+export function usePlaceLine(onErrorCallback?: ErrorCallback) {
   const { writeContract, ...rest } = useWriteContract()
+
+  const showError = (msg: string) => {
+    if (onErrorCallback) onErrorCallback(msg)
+    else console.error(msg)
+  }
 
   const placeLine = (gameId: bigint, lineId: string) => {
     console.log('[PlaceLine] Called with gameId:', gameId, 'lineId:', lineId)
@@ -237,22 +255,22 @@ export function usePlaceLine() {
             console.error('[PlaceLine] ❌ Transaction error:', error)
             const errorMsg = error.message || String(error)
             if (errorMsg.includes('NotYourTurn')) {
-              alert('❌ Not your turn!')
+              showError('Not your turn!')
             } else if (errorMsg.includes('LineAlreadyDrawn')) {
-              alert('❌ This line is already drawn!')
+              showError('This line is already drawn!')
             } else if (errorMsg.includes('GameNotActive')) {
-              alert('❌ Game is not active.')
+              showError('Game is not active.')
             } else if (errorMsg.includes('InvalidLine')) {
-              alert('❌ Invalid line position.')
+              showError('Invalid line position.')
             } else {
-              alert(`❌ Failed to place line: ${errorMsg.slice(0, 100)}`)
+              showError(`Failed to place line: ${errorMsg.slice(0, 100)}`)
             }
           },
         }
       )
     } catch (error) {
       console.error('[PlaceLine] ❌ writeContract threw error:', error)
-      alert(`❌ Error placing line: ${error}`)
+      showError(`Error placing line: ${error}`)
     }
   }
 

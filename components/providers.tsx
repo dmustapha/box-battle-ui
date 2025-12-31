@@ -5,6 +5,7 @@ import { WagmiProvider } from 'wagmi'
 import { config } from '@/lib/wagmi-config'
 import { useState } from 'react'
 import { ToastProvider } from '@/contexts/toast-context'
+import { ToastContainer } from './toast'
 import { AnimatedBackground } from './animated-background'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ToastProvider>
           <AnimatedBackground />
           {children}
+          <ToastContainer />
         </ToastProvider>
       </QueryClientProvider>
     </WagmiProvider>

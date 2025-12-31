@@ -25,6 +25,7 @@ import {
   useGameCounter,
 } from "@/hooks/useGameContract"
 import { useWebSocketGame } from "@/hooks/useWebSocketGame"
+import { useToast } from "@/contexts/toast-context"
 import { decodeEventLog } from "viem"
 import { GAME_CONTRACT_ABI } from "@/lib/contract-abi"
 import { GAME_CONTRACT_ADDRESS } from "@/lib/wagmi-config"
@@ -35,6 +36,7 @@ type GamePhase = "username-setup" | "mode-select" | "difficulty-select" | "lobby
 export default function GamePage() {
   const account = useAccount()
   const { address, isConnected } = account || { address: undefined, isConnected: false }
+  const { showToast } = useToast()
 
   // Username state
   const [playerUsername, setPlayerUsername] = useState<string>("")
@@ -65,6 +67,8 @@ export default function GamePage() {
   const [difficulty, setDifficulty] = useState<Difficulty>("medium")
   const [aiPlayer, setAiPlayer] = useState<AIPlayer | null>(null)
   const [drawnLines, setDrawnLines] = useState<Set<string>>(new Set())
+  // Ref for synchronous guard checks (state updates are async, ref updates are sync)
+  const drawnLinesRef = useRef<Set<string>>(new Set())
   const [completedBoxes, setCompletedBoxes] = useState<Map<string, "player1" | "player2">>(new Map())
   const [isProcessingMove, setIsProcessingMove] = useState(false)
   const [totalBoxes, setTotalBoxes] = useState((gridSize - 1) * (gridSize - 1))
@@ -73,6 +77,7 @@ export default function GamePage() {
   const [showPlayAgainPrompt, setShowPlayAgainPrompt] = useState(false)
   const [playAgainRequesterNum, setPlayAgainRequesterNum] = useState<number | null>(null)
   const [waitingForPlayAgainResponse, setWaitingForPlayAgainResponse] = useState(false)
+  const [lobbyTimeRemaining, setLobbyTimeRemaining] = useState(120) // 2 minute lobby timeout
 
   // Multiplayer blockchain state
   const [gameId, setGameId] = useState<bigint | undefined>()
@@ -80,8 +85,18 @@ export default function GamePage() {
   const [player1Address, setPlayer1Address] = useState<string>("")
   const [player2Address, setPlayer2Address] = useState<string>("")
   const { data: gameState, refetch: refetchGame } = useGameState(gameId)
-  const { createGame, hash: createTxHash } = useCreateGame()
-  const { joinGame, isSuccess: gameJoined, isPending: isJoinPending, isError: isJoinError, hash: joinTxHash } = useJoinGame()
+  const { createGame, hash: createTxHash, isPending: isCreatePending } = useCreateGame((msg) => {
+    showToast(msg, 'error')
+    // Reset loading state if there's an error
+    setIsCreatingGame(false)
+    isCreatingGameRef.current = false
+  })
+  const [isCreatingGame, setIsCreatingGame] = useState(false)
+  const { joinGame, isSuccess: gameJoined, isPending: isJoinPending, isError: isJoinError, hash: joinTxHash } = useJoinGame((msg) => {
+    showToast(msg, 'error')
+    // Reset joining state if there's an error
+    setIsJoiningGame(false)
+  })
 
   // Ref to track when actively creating a game (prevents event re-processing after cancel)
   const isCreatingGameRef = useRef(false)
@@ -107,7 +122,12 @@ export default function GamePage() {
     playerNum,
     playerUsername,
     gridSize,
-    enabled: gameMode === "multiplayer" && (gamePhase === "playing" || gamePhase === "lobby"),
+    // Player 1: connect when in lobby (has gameId, not joining)
+    // Player 2: connect ONLY after transaction confirms (gameJoined = true)
+    enabled: gameMode === "multiplayer" && (
+      gamePhase === "playing" ||
+      (gamePhase === "lobby" && (!isJoiningGame || gameJoined))
+    ),
     onGridSizeReceived: (receivedGridSize) => {
       // Player 2 receives grid size from Player 1
       console.log(`[Player 2] Received grid size from Player 1: ${receivedGridSize}`)
@@ -116,31 +136,33 @@ export default function GamePage() {
     onOpponentMove: (lineId, opponentPlayerNum) => {
       // Opponent move received
 
-      // Add the line immediately (this updates both players' screens)
-      setDrawnLines((prev) => {
-        const updated = new Set(prev)
-        updated.add(lineId)
-        // Updated drawn lines
+      // Update ref IMMEDIATELY (sync) to prevent race conditions
+      drawnLinesRef.current.add(lineId)
 
-        // Check if opponent completed a box with this move
-        const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, updated)
+      // Create new lines set for state
+      const updated = new Set(drawnLinesRef.current)
 
-        if (boxesCompleted > 0) {
-          // Opponent completed box(es)
-          // Opponent keeps turn, don't switch
-          setScores((prevScores) => ({
-            ...prevScores,
-            [opponentPlayerNum === 1 ? 'player1' : 'player2']: prevScores[opponentPlayerNum === 1 ? 'player1' : 'player2'] + boxesCompleted,
-          }))
-          setCompletedBoxes(newBoxes)
-        } else {
-          // Switch turn to local player
-          // Opponent didn't complete a box, switch to my turn
-          setCurrentPlayer(opponentPlayerNum === 1 ? "player2" : "player1")
-        }
+      // Update state
+      setDrawnLines(updated)
 
-        return updated
-      })
+      // Determine opponent's player key
+      const opponentPlayer: "player1" | "player2" = opponentPlayerNum === 1 ? 'player1' : 'player2'
+
+      // Check if opponent completed a box with this move (pass player explicitly to avoid stale closure)
+      const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, updated, opponentPlayer)
+
+      if (boxesCompleted > 0) {
+        // Opponent completed box(es) - update boxes first, then score
+        setCompletedBoxes(newBoxes)
+        // Opponent keeps turn, don't switch
+        setScores((prevScores) => ({
+          ...prevScores,
+          [opponentPlayer]: prevScores[opponentPlayer] + boxesCompleted,
+        }))
+      } else {
+        // Opponent didn't complete a box, switch to my turn
+        setCurrentPlayer(opponentPlayerNum === 1 ? "player2" : "player1")
+      }
     },
     onPlayerJoined: (joinedPlayerNum, joinedAddress, joinedUsername) => {
       // Player joined game
@@ -159,13 +181,15 @@ export default function GamePage() {
       }
 
       // If I'm Player 1 and Player 2 just joined, prepare the game (but DON'T start yet!)
-      if (playerNum === 1 && joinedPlayerNum === 2 && gamePhase === "lobby") {
+      // Use ref for gamePhase check to avoid stale closure
+      if (playerNum === 1 && joinedPlayerNum === 2 && gamePhaseRef.current === "lobby") {
         // Player 2 joined, preparing game state
         // Set my own address as Player 1
         if (address) {
           setPlayer1Address(address)
         }
         setPlayer2Address(joinedAddress)
+        drawnLinesRef.current = new Set()
         setDrawnLines(new Set())
         setCompletedBoxes(new Map())
         setScores({ player1: 0, player2: 0 })
@@ -177,10 +201,8 @@ export default function GamePage() {
       // Check if we're still in lobby phase
       if (gamePhaseRef.current === "lobby") {
         // In lobby - just notify and return to mode select (no winner)
-        setTimeout(() => {
-          alert(`Player ${leftPlayerNum} left the lobby. Returning to menu.`)
-          handleReset()
-        }, 100)
+        showToast(`Player ${leftPlayerNum} left the lobby. Returning to menu.`, "info")
+        handleReset()
         return
       }
 
@@ -189,19 +211,15 @@ export default function GamePage() {
       setWinner(myPlayerKey)
 
       // Show win message and return to mode selection
-      setTimeout(() => {
-        alert(`Player ${leftPlayerNum} left the game. You win!`)
-        handleReset()
-      }, 100)
+      showToast(`Player ${leftPlayerNum} left the game. You win!`, "success")
+      handleReset()
     },
     onPlayerQuit: (quitPlayerNum) => {
       // Check if we're still in lobby phase
       if (gamePhaseRef.current === "lobby") {
         // In lobby - just notify and return to mode select (no winner)
-        setTimeout(() => {
-          alert(`Player ${quitPlayerNum} cancelled. Returning to menu.`)
-          handleReset()
-        }, 100)
+        showToast(`Player ${quitPlayerNum} cancelled. Returning to menu.`, "info")
+        handleReset()
         return
       }
 
@@ -210,10 +228,8 @@ export default function GamePage() {
       setWinner(myPlayerKey)
 
       // Show win message
-      setTimeout(() => {
-        alert(`Player ${quitPlayerNum} quit the game. You win!`)
-        handleReset()
-      }, 100)
+      showToast(`Player ${quitPlayerNum} quit the game. You win!`, "success")
+      handleReset()
     },
     onPlayAgainRequest: (requesterNum) => {
       // Opponent wants to play again
@@ -227,7 +243,7 @@ export default function GamePage() {
         handleRestartMultiplayer()
       } else {
         // Opponent declined, go back to menu
-        alert("Your opponent declined. Returning to menu.")
+        showToast("Your opponent declined. Returning to menu.", "info")
         handleReset()
       }
     },
@@ -274,6 +290,7 @@ export default function GamePage() {
         const extractedGameId = BigInt(gameIdHex)
 
         setGameId(extractedGameId)
+        setIsCreatingGame(false)
         setGamePhase("lobby")
       } else {
         console.error('[Game] NO GameCreated event found - transaction may have reverted')
@@ -287,6 +304,7 @@ export default function GamePage() {
         // Also check ref inside timer to prevent late execution after cancel
         if (!gameId && isCreatingGameRef.current) {
           setGameId(gameCounter)
+          setIsCreatingGame(false)
           setGamePhase("lobby")
         }
       }, 3000)
@@ -332,6 +350,7 @@ export default function GamePage() {
     if (event.player1?.toLowerCase() === address?.toLowerCase()) {
       console.log('[GameCreated] This is my game! Setting gameId and transitioning to lobby')
       setGameId(event.gameId)
+      setIsCreatingGame(false)
       setGamePhase("lobby")
     } else {
       console.log('[GameCreated] Not my game, ignoring')
@@ -350,8 +369,17 @@ export default function GamePage() {
 
     // Use string comparison for BigInt to be safe
     if (gameId && event.gameId.toString() === gameId.toString()) {
+      // IMPORTANT: Only reset state if game hasn't started yet!
+      // The blockchain event can arrive AFTER WebSocket first-turn and moves have been made.
+      // WebSocket is faster than blockchain, so we should NOT reset if already playing.
+      if (gamePhaseRef.current === "playing") {
+        console.log('[GameStarted] Game already playing, NOT resetting state (blockchain event arrived late)')
+        return
+      }
+
       console.log('[GameStarted] THIS IS MY GAME! Preparing state...')
       // Reset game state for new multiplayer game
+      drawnLinesRef.current = new Set()
       setDrawnLines(new Set())
       setCompletedBoxes(new Map())
       setScores({ player1: 0, player2: 0 })
@@ -370,44 +398,8 @@ export default function GamePage() {
     }
   })
 
-  // Recalculate completed boxes when drawn lines change
-  useEffect(() => {
-    if (drawnLines.size > 0) {
-      const newBoxes = new Map<string, "player1" | "player2">()
-
-      // Check all possible boxes
-      for (let row = 0; row < gridSize - 1; row++) {
-        for (let col = 0; col < gridSize - 1; col++) {
-          const boxId = `box-${row}-${col}`
-
-          // Line format: h-row-col-row-col+1 or v-row-col-row+1-col
-          const top = `h-${row}-${col}-${row}-${col + 1}`
-          const bottom = `h-${row + 1}-${col}-${row + 1}-${col + 1}`
-          const left = `v-${row}-${col}-${row + 1}-${col}`
-          const right = `v-${row}-${col + 1}-${row + 1}-${col + 1}`
-
-          if (drawnLines.has(top) && drawnLines.has(bottom) && drawnLines.has(left) && drawnLines.has(right)) {
-            // Determine who completed this box based on which player last made a move
-            newBoxes.set(boxId, currentPlayer)
-          }
-        }
-      }
-
-      // Update completed boxes and scores
-      if (newBoxes.size > completedBoxes.size) {
-        const newlyCompleted = newBoxes.size - completedBoxes.size
-        console.log('[Game] New boxes completed:', newlyCompleted, 'by', currentPlayer)
-
-        setCompletedBoxes(newBoxes)
-
-        // Update scores
-        setScores((prev) => ({
-          ...prev,
-          [currentPlayer]: prev[currentPlayer] + newlyCompleted
-        }))
-      }
-    }
-  }, [drawnLines, gridSize, currentPlayer, completedBoxes.size])
+  // NOTE: Scoring is handled directly in move handlers (handleLineClick, makeAIMove, onOpponentMove)
+  // DO NOT add a useEffect here to recalculate scores - it causes duplicate counting!
 
   // Box completion check
   const isBoxComplete = useCallback((boxRow: number, boxCol: number, testLines: Set<string>): boolean => {
@@ -420,7 +412,7 @@ export default function GamePage() {
   }, [])
 
   const checkBoxCompletion = useCallback(
-    (lineId: string, testLines: Set<string>): { newBoxes: Map<string, "player1" | "player2">; count: number } => {
+    (lineId: string, testLines: Set<string>, player: "player1" | "player2"): { newBoxes: Map<string, "player1" | "player2">; count: number } => {
       const newBoxes = new Map(completedBoxes)
       let completedCount = 0
 
@@ -433,7 +425,7 @@ export default function GamePage() {
           if (newBoxes.has(boxId)) continue
 
           if (isBoxComplete(row, col, testLines)) {
-            newBoxes.set(boxId, currentPlayer)
+            newBoxes.set(boxId, player)
             completedCount++
           }
         }
@@ -441,7 +433,7 @@ export default function GamePage() {
 
       return { newBoxes, count: completedCount }
     },
-    [completedBoxes, currentPlayer, isBoxComplete, gridSize],
+    [completedBoxes, isBoxComplete, gridSize],
   )
 
   // AI Move logic
@@ -455,7 +447,7 @@ export default function GamePage() {
       return
     }
 
-    const aiMove = aiPlayer.makeMove(drawnLines, gridSize - 1)
+    const aiMove = aiPlayer.makeMove(drawnLinesRef.current, gridSize - 1)
     console.log("[AI] AI move selected:", aiMove.lineId)
 
     if (!aiMove.lineId) {
@@ -464,17 +456,20 @@ export default function GamePage() {
       return
     }
 
-    // Add the line
-    const newDrawnLines = new Set(drawnLines)
-    newDrawnLines.add(aiMove.lineId)
+    // Update ref IMMEDIATELY (sync) to prevent race conditions
+    drawnLinesRef.current.add(aiMove.lineId)
 
-    // Check for completed boxes
-    const { newBoxes, count: boxesCompleted } = checkBoxCompletion(aiMove.lineId, newDrawnLines)
+    // Create new lines set for state
+    const newDrawnLines = new Set(drawnLinesRef.current)
+
+    // Update drawn lines state
+    setDrawnLines(newDrawnLines)
+
+    // Check for completed boxes (AI is always player2)
+    const { newBoxes, count: boxesCompleted } = checkBoxCompletion(aiMove.lineId, newDrawnLines, "player2")
+    setCompletedBoxes(newBoxes)
 
     console.log("[AI] Boxes completed by AI:", boxesCompleted)
-
-    setDrawnLines(newDrawnLines)
-    setCompletedBoxes(newBoxes)
 
     if (boxesCompleted > 0) {
       setScores((prev) => ({
@@ -491,7 +486,7 @@ export default function GamePage() {
     }
 
     setIsProcessingMove(false)
-  }, [aiPlayer, drawnLines, checkBoxCompletion, gridSize])
+  }, [aiPlayer, checkBoxCompletion, gridSize])
 
   // Check for game end (works for BOTH AI and Multiplayer)
   useEffect(() => {
@@ -603,10 +598,38 @@ export default function GamePage() {
     return () => clearInterval(interval)
   }, [gamePhase, timer, scores])
 
+  // Lobby timeout countdown (120 seconds)
+  useEffect(() => {
+    // Only run in lobby phase for multiplayer with a gameId
+    if (gamePhase !== "lobby" || gameMode !== "multiplayer" || !gameId) {
+      return
+    }
+
+    // Reset timer when entering lobby
+    setLobbyTimeRemaining(120)
+
+    const interval = setInterval(() => {
+      setLobbyTimeRemaining((prev) => {
+        if (prev <= 1) {
+          // Timeout expired - cancel and return to menu
+          console.log('[Lobby] Timeout expired, returning to menu')
+          isCreatingGameRef.current = false
+          showToast('Lobby timeout. No opponent joined in time.', 'info')
+          handleReset()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [gamePhase, gameMode, gameId])
+
   // Handle line click
   const handleLineClick = useCallback(
     (lineId: string) => {
-      if (isProcessingMove || drawnLines.has(lineId) || gamePhase !== "playing") return
+      // Use ref for guard check (synchronous) - state updates are async and can cause duplicate clicks
+      if (isProcessingMove || drawnLinesRef.current.has(lineId) || gamePhase !== "playing") return
 
       // AI mode: only allow player 1 to click
       if (gameMode === "ai" && currentPlayer !== "player1") return
@@ -632,29 +655,33 @@ export default function GamePage() {
         // Play line click sound
         playLineClick()
 
-        // Add line locally (optimistic update)
-        const newDrawnLines = new Set(drawnLines)
-        newDrawnLines.add(lineId)
+        // Update ref IMMEDIATELY (sync) to prevent duplicate clicks
+        drawnLinesRef.current.add(lineId)
+
+        // Create new lines set with this line added for state
+        const newDrawnLines = new Set(drawnLinesRef.current)
+
+        // Update drawn lines state (async)
         setDrawnLines(newDrawnLines)
 
-        // Check for completed boxes
-        const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, newDrawnLines)
+        // Check for completed boxes with the updated lines (pass currentPlayer explicitly)
+        const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, newDrawnLines, currentPlayer)
         setCompletedBoxes(newBoxes)
 
         if (boxesCompleted > 0) {
           // Play box complete sound
           playBoxComplete()
           // Update my score
-          setScores((prev) => ({
-            ...prev,
-            [currentPlayer]: prev[currentPlayer] + boxesCompleted,
+          setScores((prevScores) => ({
+            ...prevScores,
+            [currentPlayer]: prevScores[currentPlayer] + boxesCompleted,
           }))
-          setMoveHistory((prev) => [...prev.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
+          setMoveHistory((prevHistory) => [...prevHistory.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
           // Keep current turn, don't switch
         } else {
           // Switch turns
           setCurrentPlayer(currentPlayer === "player1" ? "player2" : "player1")
-          setMoveHistory((prev) => [...prev.slice(-2), "Turn passed to opponent"])
+          setMoveHistory((prevHistory) => [...prevHistory.slice(-2), "Turn passed to opponent"])
         }
 
         // Send move to opponent via WebSocket
@@ -668,31 +695,35 @@ export default function GamePage() {
       // Play line click sound
       playLineClick()
 
-      const newDrawnLines = new Set(drawnLines)
-      newDrawnLines.add(lineId)
+      // Update ref IMMEDIATELY (sync) to prevent duplicate clicks
+      drawnLinesRef.current.add(lineId)
 
-      // Check for completed boxes
-      const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, newDrawnLines)
+      // Create new lines set for state
+      const newDrawnLines = new Set(drawnLinesRef.current)
 
+      // Update drawn lines state (async)
       setDrawnLines(newDrawnLines)
+
+      // Check for completed boxes (human is always player1 in AI mode)
+      const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, newDrawnLines, "player1")
       setCompletedBoxes(newBoxes)
 
       if (boxesCompleted > 0) {
         // Play box complete sound
         playBoxComplete()
-        setScores((prev) => ({
-          ...prev,
-          player1: prev.player1 + boxesCompleted,
+        setScores((prevScores) => ({
+          ...prevScores,
+          player1: prevScores.player1 + boxesCompleted,
         }))
-        setMoveHistory((prev) => [...prev.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
+        setMoveHistory((prevHistory) => [...prevHistory.slice(-2), `You completed ${boxesCompleted} box(es) - your turn again!`])
       } else {
         setCurrentPlayer("player2")
-        setMoveHistory((prev) => [...prev.slice(-2), "Turn passed"])
+        setMoveHistory((prevHistory) => [...prevHistory.slice(-2), "Turn passed"])
       }
 
       setIsProcessingMove(false)
     },
-    [drawnLines, isProcessingMove, gameMode, currentPlayer, gamePhase, checkBoxCompletion, playerNum, sendMove],
+    [isProcessingMove, gameMode, currentPlayer, gamePhase, checkBoxCompletion, playerNum, sendMove],
   )
 
   const handleUsernameSubmit = (username: string) => {
@@ -726,11 +757,21 @@ export default function GamePage() {
   const handleCreateGame = () => {
     // Creating game
     isCreatingGameRef.current = true
+    setIsCreatingGame(true)
     // Set my address as Player 1
     if (address) {
       setPlayer1Address(address)
     }
     createGame()
+  }
+
+  // Cancel creating game (before transaction confirms)
+  const handleCancelCreateGame = () => {
+    console.log('[Game] Cancelling game creation')
+    isCreatingGameRef.current = false
+    setIsCreatingGame(false)
+    // Note: The blockchain transaction may still go through,
+    // but we won't track it or enter the lobby
   }
 
   const handleJoinGame = (gameIdToJoin: bigint) => {
@@ -745,6 +786,21 @@ export default function GamePage() {
     joinGame(gameIdToJoin)
   }
 
+  // Cancel from lobby - notify opponent and reset state
+  const handleCancelLobby = () => {
+    console.log('[Lobby] Cancel - notifying opponent and resetting')
+
+    // Send quit notification via WebSocket (if connected)
+    if (sendQuit) {
+      sendQuit()
+    }
+
+    // Reset the creating game flag to prevent event re-processing
+    isCreatingGameRef.current = false
+
+    // Reset all game state
+    handleReset()
+  }
 
   // Watch for successful game join - prepare Player 2's state
   useEffect(() => {
@@ -792,11 +848,13 @@ export default function GamePage() {
   const handleReset = () => {
     // Reset the creating game flag to prevent event re-processing
     isCreatingGameRef.current = false
+    setIsCreatingGame(false)
     setScores({ player1: 0, player2: 0 })
     setWinner(null)
     setMoveHistory([])
     setCurrentPlayer("player1")
     setTimer(getTimerForGridSize(gridSize))
+    drawnLinesRef.current = new Set()
     setDrawnLines(new Set())
     setCompletedBoxes(new Map())
     setGamePhase("mode-select")
@@ -816,6 +874,7 @@ export default function GamePage() {
     setMoveHistory([])
     setCurrentPlayer("player1")
     setTimer(getTimerForGridSize(gridSize))
+    drawnLinesRef.current = new Set()
     setDrawnLines(new Set())
     setCompletedBoxes(new Map())
     // Keep gameMode, difficulty, aiPlayer, and gridSize
@@ -828,6 +887,7 @@ export default function GamePage() {
     setMoveHistory([])
     // Don't set currentPlayer here - server will send new first-turn via WebSocket
     setTimer(getTimerForGridSize(gridSize))
+    drawnLinesRef.current = new Set()
     setDrawnLines(new Set())
     setCompletedBoxes(new Map())
     setShowPlayAgainPrompt(false)
@@ -924,14 +984,17 @@ export default function GamePage() {
       <MultiplayerLobby
         onJoinGame={handleJoinGame}
         onCreateGame={handleCreateGame}
-        onBack={() => setGamePhase("mode-select")}
+        onBack={gameId ? handleCancelLobby : () => setGamePhase("mode-select")}
+        onCancelCreate={handleCancelCreateGame}
         playerAddress={address || ""}
         createdGameId={gameId}
         isWaitingForOpponent={gameId !== undefined}
+        isCreatingGame={isCreatingGame && !gameId}
         gridSize={gridSize}
         onGridSizeChange={(size) => setGridSize(size as 3 | 4 | 5 | 6)}
         isJoining={isJoiningGame}
         isJoinPending={isJoinPending}
+        lobbyTimeRemaining={lobbyTimeRemaining}
       />
     )
   }
@@ -1117,13 +1180,14 @@ export default function GamePage() {
         >
           <Clock className="w-3.5 h-3.5" />
           <span>
-            {currentPlayer === "player1"
-              ? gameMode === "ai"
+            {gameMode === "ai"
+              ? currentPlayer === "player1"
                 ? "Your Turn"
-                : "Player 1's Turn"
-              : gameMode === "ai"
-                ? "AI Thinking..."
-                : "Player 2's Turn"}
+                : "AI Thinking..."
+              : // Multiplayer - check if it's my turn
+                (currentPlayer === "player1" && playerNum === 1) || (currentPlayer === "player2" && playerNum === 2)
+                ? "Your Turn"
+                : "Opponent's Turn"}
           </span>
         </div>
 

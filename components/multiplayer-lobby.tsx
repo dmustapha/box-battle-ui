@@ -6,32 +6,40 @@ import { Input } from "@/components/ui/input"
 import { ArrowLeft, Copy, Check, AlertCircle, Loader2, Grid3x3, Users } from "lucide-react"
 import { useAccount, useSwitchChain } from "wagmi"
 import { mantleSepolia } from "@/lib/wagmi-config"
+import { useToast } from "@/contexts/toast-context"
 
 interface MultiplayerLobbyProps {
   onJoinGame: (gameId: bigint) => void
   onCreateGame: () => void
   onBack?: () => void
+  onCancelCreate?: () => void
   playerAddress: string
   createdGameId?: bigint
   isWaitingForOpponent?: boolean
+  isCreatingGame?: boolean
   gridSize: number
   onGridSizeChange: (size: number) => void
   isJoining?: boolean
   isJoinPending?: boolean
+  lobbyTimeRemaining?: number
 }
 
 export default function MultiplayerLobby({
   onJoinGame,
   onCreateGame,
   onBack,
+  onCancelCreate,
   playerAddress,
   createdGameId,
   isWaitingForOpponent,
+  isCreatingGame,
   gridSize,
   onGridSizeChange,
   isJoining,
   isJoinPending,
+  lobbyTimeRemaining,
 }: MultiplayerLobbyProps) {
+  const { showToast } = useToast()
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")
   const [gameIdInput, setGameIdInput] = useState("")
   const [copied, setCopied] = useState(false)
@@ -62,8 +70,58 @@ export default function MultiplayerLobby({
     }
   }
 
-  // Show waiting screen for Player 2 (joining)
-  if (isJoining && createdGameId !== undefined) {
+  // Show loading screen while creating game (transaction pending)
+  if (isCreatingGame) {
+    return (
+      <div className="min-h-screen bg-transparent relative z-10 flex items-center justify-center p-6">
+        <div className="text-center max-w-md w-full">
+          <Loader2 className="w-16 h-16 mx-auto mb-6 text-accent-blue animate-spin" />
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Creating Game...
+          </h2>
+          <p className="text-[var(--color-text-secondary)] text-lg mb-6">
+            Please confirm the transaction in your wallet
+          </p>
+          {onCancelCreate && (
+            <button
+              onClick={onCancelCreate}
+              className="px-6 py-2 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated hover:text-white transition-all"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading screen for Player 2 (transaction pending)
+  if (isJoinPending && isJoining) {
+    return (
+      <div className="min-h-screen bg-transparent relative z-10 flex items-center justify-center p-6">
+        <div className="text-center max-w-md w-full">
+          <Loader2 className="w-16 h-16 mx-auto mb-6 text-accent-blue animate-spin" />
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Joining Game...
+          </h2>
+          <p className="text-[var(--color-text-secondary)] text-lg mb-6">
+            Please confirm the transaction in your wallet
+          </p>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-6 py-2 border border-[var(--color-border)] rounded-lg text-[var(--color-text-secondary)] hover:bg-bg-elevated hover:text-white transition-all"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Show waiting screen for Player 2 (transaction confirmed, waiting for game start)
+  if (isJoining && createdGameId !== undefined && !isJoinPending) {
     return (
       <div className="min-h-screen bg-transparent relative z-10 flex items-center justify-center p-6">
         <div className="text-center max-w-md w-full">
@@ -71,11 +129,8 @@ export default function MultiplayerLobby({
           <h2 className="text-3xl font-bold text-white mb-4">
             Joined Game #{createdGameId.toString()}!
           </h2>
-          <p className="text-[var(--color-text-secondary)] text-lg mb-4">
+          <p className="text-[var(--color-text-secondary)] text-lg mb-6">
             Waiting for game to start...
-          </p>
-          <p className="text-sm text-[var(--color-text-tertiary)] mb-6">
-            The game will begin shortly
           </p>
           {onBack && (
             <button
@@ -90,15 +145,32 @@ export default function MultiplayerLobby({
     )
   }
 
+  // Format time as mm:ss
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
   // Show waiting screen for Player 1 (created game)
   if (isWaitingForOpponent && createdGameId !== undefined && !isJoining) {
     return (
       <div className="min-h-screen bg-transparent relative z-10 flex items-center justify-center p-6">
         <div className="text-center max-w-md w-full">
           <Loader2 className="w-16 h-16 mx-auto mb-6 text-accent-blue animate-spin" />
-          <h2 className="text-3xl font-bold text-white mb-6">
+          <h2 className="text-3xl font-bold text-white mb-4">
             Waiting for Player 2...
           </h2>
+
+          {/* Lobby Timeout Timer */}
+          {lobbyTimeRemaining !== undefined && (
+            <div className="mb-6">
+              <p className="text-sm text-[var(--color-text-tertiary)] mb-1">Time remaining</p>
+              <p className={`text-2xl font-mono font-bold ${lobbyTimeRemaining <= 30 ? 'text-state-error' : 'text-accent-blue'}`}>
+                {formatTime(lobbyTimeRemaining)}
+              </p>
+            </div>
+          )}
 
           <div className="card border mb-6">
             <p className="text-sm text-[var(--color-text-tertiary)] mb-3">
@@ -249,7 +321,7 @@ export default function MultiplayerLobby({
               <button
                 onClick={() => {
                   if (!isOnMantleSepolia) {
-                    alert('⚠️ Please switch to Mantle Sepolia first!')
+                    showToast('Please switch to Mantle Sepolia first!', 'error')
                     return
                   }
                   // Creating game
@@ -289,7 +361,7 @@ export default function MultiplayerLobby({
                   <Button
                     onClick={() => {
                       if (!isOnMantleSepolia) {
-                        alert('⚠️ Please switch to Mantle Sepolia first!')
+                        showToast('Please switch to Mantle Sepolia first!', 'error')
                         return
                       }
                       handleJoinGame()
