@@ -42,9 +42,8 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
     /**
      * Particle count on desktop devices
-     * Volume 5 spec: 40 desktop
      */
-    desktop: 40,
+    desktop: 30,
   },
 
   // ---------------------------------------------------------------------------
@@ -221,7 +220,7 @@ export const ANIMATION_CONFIG: AnimationConfig = {
      * Range: 30-120 recommended
      * Lower = calmer, Higher = more energetic
      */
-    baseSpeed: 25,
+    baseSpeed: 40,
 
     /**
      * Friction coefficient (applied each frame)
