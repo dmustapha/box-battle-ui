@@ -127,7 +127,7 @@ export default function ProfilePage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen" style={{ background: 'radial-gradient(circle at 50% 40%, #1a1f35 0%, #12172a 50%, #0a0e1a 100%)' }}>
+      <div className="min-h-screen relative z-10 bg-transparent">
         {/* Header with navigation */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
           <Link href="/">
@@ -157,7 +157,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ background: 'radial-gradient(circle at 50% 40%, #1a1f35 0%, #12172a 50%, #0a0e1a 100%)' }}>
+      <div className="min-h-screen relative z-10 bg-transparent">
         {/* Header with WalletMenu */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
           <Link href="/">
@@ -181,7 +181,7 @@ export default function ProfilePage() {
 
   if (!stats) {
     return (
-      <div className="min-h-screen" style={{ background: 'radial-gradient(circle at 50% 40%, #1a1f35 0%, #12172a 50%, #0a0e1a 100%)' }}>
+      <div className="min-h-screen relative z-10 bg-transparent">
         {/* Header with WalletMenu */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
           <Link href="/">
@@ -210,7 +210,7 @@ export default function ProfilePage() {
   const streakIcon = stats.stats.streaks.current.type === 'win' ? '🔥' : '💔'
 
   return (
-    <div className="min-h-screen" style={{ background: 'radial-gradient(circle at 50% 40%, #1a1f35 0%, #12172a 50%, #0a0e1a 100%)' }}>
+    <div className="min-h-screen relative z-10 bg-transparent">
       <div className="max-w-6xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
