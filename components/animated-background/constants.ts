@@ -36,25 +36,15 @@ export const ANIMATION_CONFIG: AnimationConfig = {
   particleCounts: {
     /**
      * Particle count on mobile devices
-     *
-     * Reduced from original 20 to 15 for performance headroom.
-     * Lower values improve FPS on budget devices.
-     *
-     * Range: 10-20 recommended
-     * Default: 15
+     * Volume 5 spec: 25 mobile
      */
-    mobile: 15,
+    mobile: 25,
 
     /**
      * Particle count on desktop devices
-     *
-     * Reduced from original 35 to 30 to allow for more complex effects
-     * while maintaining 60fps target.
-     *
-     * Range: 20-40 recommended
-     * Default: 30
+     * Volume 5 spec: 40 desktop
      */
-    desktop: 30,
+    desktop: 40,
   },
 
   // ---------------------------------------------------------------------------
@@ -85,9 +75,8 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
       /**
        * Size range in pixels [min, max]
-       * Smaller than mid/near layers for distance effect
        */
-      sizeRange: [15, 25],
+      sizeRange: [20, 35],
 
       /**
        * Speed multiplier (40% of base speed)
@@ -97,16 +86,15 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
       /**
        * Opacity range [min, max]
-       * Very dim for background feel
+       * Volume 5 spec: 0.6-0.8 for far layer
        */
-      opacityRange: [0.08, 0.15],
+      opacityRange: [0.6, 0.8],
 
       /**
        * Shadow blur amount in pixels
-       * More blur = softer, more distant
-       * Performance: Affects GPU rendering
+       * Volume 5 spec: 8px for far layer
        */
-      blurAmount: 20,
+      blurAmount: 8,
 
       /**
        * Parallax factor for mouse interaction
@@ -135,9 +123,8 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
       /**
        * Size range in pixels [min, max]
-       * This was the original particle size range
        */
-      sizeRange: [25, 40],
+      sizeRange: [30, 50],
 
       /**
        * Speed multiplier (100% of base speed)
@@ -147,15 +134,15 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
       /**
        * Opacity range [min, max]
-       * Medium visibility
+       * Volume 5 spec: 0.7-0.85 for mid layer
        */
-      opacityRange: [0.15, 0.35],
+      opacityRange: [0.7, 0.85],
 
       /**
        * Shadow blur amount in pixels
-       * Similar to original implementation
+       * Volume 5 spec: 5px for mid layer
        */
-      blurAmount: 15,
+      blurAmount: 5,
 
       /**
        * Parallax factor for mouse interaction
@@ -186,9 +173,8 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
       /**
        * Size range in pixels [min, max]
-       * Larger for foreground prominence
        */
-      sizeRange: [40, 60],
+      sizeRange: [45, 70],
 
       /**
        * Speed multiplier (160% of base speed)
@@ -198,15 +184,15 @@ export const ANIMATION_CONFIG: AnimationConfig = {
 
       /**
        * Opacity range [min, max]
-       * Higher opacity for foreground presence
+       * Volume 5 spec: 0.8-1.0 for near layer
        */
-      opacityRange: [0.25, 0.45],
+      opacityRange: [0.8, 1.0],
 
       /**
        * Shadow blur amount in pixels
-       * Less blur = sharper = feels closer
+       * Volume 5 spec: 2px for near layer (sharp)
        */
-      blurAmount: 10,
+      blurAmount: 2,
 
       /**
        * Parallax factor for mouse interaction
@@ -235,7 +221,7 @@ export const ANIMATION_CONFIG: AnimationConfig = {
      * Range: 30-120 recommended
      * Lower = calmer, Higher = more energetic
      */
-    baseSpeed: 60,
+    baseSpeed: 25,
 
     /**
      * Friction coefficient (applied each frame)
@@ -353,11 +339,11 @@ export const ANIMATION_CONFIG: AnimationConfig = {
      * Maximum opacity when mouse is very close
      *
      * Particles can boost up to this opacity near mouse.
-     * 0.8 is bright but not fully opaque (maintains glassmorphism).
+     * 1.0 for full brightness on hover.
      *
      * Range: 0.6-1.0 recommended
      */
-    opacityBoostMax: 0.8,
+    opacityBoostMax: 1.0,
 
     /**
      * Scale range for pulsing effect
@@ -441,6 +427,62 @@ export const ANIMATION_CONFIG: AnimationConfig = {
      * Higher values can look garish
      */
     intensity: 0.4,
+  },
+
+  // ---------------------------------------------------------------------------
+  // LIFECYCLE (FADE IN/OUT)
+  // Performance: 🟢 Low impact
+  // ---------------------------------------------------------------------------
+
+  lifecycle: {
+    /**
+     * Whether lifecycle (fade in/out) is enabled
+     *
+     * When enabled, particles will fade in when spawning,
+     * live for a period, then fade out and respawn elsewhere.
+     * This creates an organic, breathing effect.
+     */
+    enabled: true,
+
+    /**
+     * Minimum lifespan in seconds
+     *
+     * Shortest time a particle will live before fading out.
+     * 8 seconds gives time for particles to be seen
+     *
+     * Range: 5-15 recommended
+     */
+    minLifespan: 8,
+
+    /**
+     * Maximum lifespan in seconds
+     *
+     * Longest time a particle will live before fading out.
+     * 15 seconds prevents particles from living too long
+     *
+     * Range: 10-25 recommended
+     */
+    maxLifespan: 15,
+
+    /**
+     * Fade-in duration in seconds
+     *
+     * How long it takes for a particle to fade in from invisible.
+     * 1.5 seconds is smooth but noticeable
+     *
+     * Range: 0.5-3 recommended
+     */
+    fadeInDuration: 1.5,
+
+    /**
+     * Fade-out duration in seconds
+     *
+     * How long it takes for a particle to fade out to invisible.
+     * 2 seconds is slightly longer for dramatic exit
+     *
+     * Range: 0.5-3 recommended
+     */
+    fadeOutDuration: 2,
   },
 }
 

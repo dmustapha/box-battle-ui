@@ -828,7 +828,7 @@ export default function GamePage() {
   // Show wallet connection prompt
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-bg-primary">
+      <div className="min-h-screen bg-transparent relative z-10">
         <Header timer={timer} />
         <div className="flex h-[calc(100vh-120px)] items-center justify-center p-6">
           <div className="max-w-2xl w-full">
@@ -909,7 +909,7 @@ export default function GamePage() {
 
   return (
     <div
-      className="min-h-screen relative"
+      className="min-h-screen relative z-10"
       style={{
         background: 'radial-gradient(circle at 50% 30%, #1e2541 0%, #151929 40%, #0f141f 100%)',
         backgroundImage: `

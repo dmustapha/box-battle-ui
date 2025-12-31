@@ -125,6 +125,28 @@ export interface EnhancedBox {
 
   /** Maximum number of trail points to keep */
   maxTrailLength: number
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle Properties (NEW - Phase 5)
+  // ---------------------------------------------------------------------------
+
+  /** Current lifecycle state: spawning (fade in), alive (normal), dying (fade out), dead (respawn) */
+  lifecycleState: 'spawning' | 'alive' | 'dying' | 'dead'
+
+  /** Progress through current lifecycle phase (0-1) */
+  lifecycleProgress: number
+
+  /** Total lifespan in seconds before dying */
+  lifespan: number
+
+  /** Time alive in current life cycle (seconds) */
+  age: number
+
+  /** Duration of fade-in effect (seconds) */
+  fadeInDuration: number
+
+  /** Duration of fade-out effect (seconds) */
+  fadeOutDuration: number
 }
 
 // =============================================================================
@@ -263,6 +285,32 @@ export interface ShimmerConfig {
 }
 
 // =============================================================================
+// LIFECYCLE CONFIGURATION
+// =============================================================================
+
+/**
+ * Particle lifecycle parameters
+ *
+ * Controls particle lifespan, fade in/out durations, and respawn behavior.
+ */
+export interface LifecycleConfig {
+  /** Whether lifecycle (fade in/out) is enabled */
+  enabled: boolean
+
+  /** Minimum lifespan in seconds */
+  minLifespan: number
+
+  /** Maximum lifespan in seconds */
+  maxLifespan: number
+
+  /** Fade-in duration in seconds */
+  fadeInDuration: number
+
+  /** Fade-out duration in seconds */
+  fadeOutDuration: number
+}
+
+// =============================================================================
 // MAIN CONFIGURATION INTERFACE
 // =============================================================================
 
@@ -297,6 +345,9 @@ export interface AnimationConfig {
 
   /** Shimmer effect parameters */
   shimmer: ShimmerConfig
+
+  /** Lifecycle (fade in/out) parameters */
+  lifecycle: LifecycleConfig
 }
 
 // =============================================================================
@@ -307,6 +358,11 @@ export interface AnimationConfig {
  * Depth layer literal type
  */
 export type DepthLayer = 'far' | 'mid' | 'near'
+
+/**
+ * Lifecycle state literal type
+ */
+export type LifecycleState = 'spawning' | 'alive' | 'dying' | 'dead'
 
 /**
  * Color palette entry

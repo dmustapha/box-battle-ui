@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import type { EnhancedBox, DepthLayer } from "./animated-background/types"
-import { createParticle, createCanvasGradient } from "./animated-background/utils"
+import { createParticle, createCanvasGradient, respawnParticle, easeInOutCubic } from "./animated-background/utils"
 import { ANIMATION_CONFIG } from "./animated-background/constants"
 
 // Legacy type alias for backward compatibility during migration
@@ -223,6 +223,44 @@ export function AnimatedBackground() {
         if (box.rotation > Math.PI * 2) box.rotation -= Math.PI * 2
         if (box.rotation < 0) box.rotation += Math.PI * 2
 
+        // Phase 5: Update lifecycle state (fade in/out)
+        if (ANIMATION_CONFIG.lifecycle.enabled) {
+          box.age += deltaTime
+
+          switch (box.lifecycleState) {
+            case 'spawning':
+              // Fade in: progress from 0 to 1 over fadeInDuration
+              box.lifecycleProgress = Math.min(1, box.age / box.fadeInDuration)
+              if (box.lifecycleProgress >= 1) {
+                box.lifecycleState = 'alive'
+                box.lifecycleProgress = 0
+              }
+              break
+
+            case 'alive':
+              // Normal state: check if lifespan exceeded
+              if (box.age >= box.lifespan) {
+                box.lifecycleState = 'dying'
+                box.lifecycleProgress = 0
+              }
+              break
+
+            case 'dying':
+              // Fade out: progress from 0 to 1 over fadeOutDuration
+              const dyingAge = box.age - box.lifespan
+              box.lifecycleProgress = Math.min(1, dyingAge / box.fadeOutDuration)
+              if (box.lifecycleProgress >= 1) {
+                box.lifecycleState = 'dead'
+              }
+              break
+
+            case 'dead':
+              // Respawn the particle
+              respawnParticle(box)
+              break
+          }
+        }
+
         // Bounce off walls with energy loss (0.8 = retain 80% of velocity)
         if (box.x < 0 || box.x + box.size > window.innerWidth) box.vx *= -0.8
         if (box.y < 0 || box.y + box.size > window.innerHeight) box.vy *= -0.8
@@ -263,6 +301,28 @@ export function AnimatedBackground() {
           box.targetScale = 1.0
         }
 
+        // Phase 5: Apply lifecycle opacity modifier (fade in/out)
+        if (ANIMATION_CONFIG.lifecycle.enabled) {
+          let lifecycleOpacity = 1.0
+          switch (box.lifecycleState) {
+            case 'spawning':
+              // Fade in with easing
+              lifecycleOpacity = easeInOutCubic(box.lifecycleProgress)
+              break
+            case 'alive':
+              lifecycleOpacity = 1.0
+              break
+            case 'dying':
+              // Fade out with easing (1 - progress)
+              lifecycleOpacity = 1 - easeInOutCubic(box.lifecycleProgress)
+              break
+            case 'dead':
+              lifecycleOpacity = 0
+              break
+          }
+          opacity *= lifecycleOpacity
+        }
+
         // Phase 3: Smooth scale interpolation (lerp)
         const scaleSpeed = 5.0 // How fast scale changes (higher = faster)
         box.scale += (box.targetScale - box.scale) * scaleSpeed * deltaTime
@@ -270,6 +330,61 @@ export function AnimatedBackground() {
         // Draw the box
         drawBox(box, opacity)
       })
+
+      // Draw network connection lines between nearby particles
+      const connectionRadius = 150 // Max distance for connections
+      ctx.lineWidth = 1
+
+      for (let i = 0; i < sortedBoxes.length; i++) {
+        for (let j = i + 1; j < sortedBoxes.length; j++) {
+          const p1 = sortedBoxes[i]
+          const p2 = sortedBoxes[j]
+
+          // Only connect particles in the same depth layer
+          if (p1.depth !== p2.depth) continue
+
+          // Skip connections for dead or nearly dead particles
+          if (p1.lifecycleState === 'dead' || p2.lifecycleState === 'dead') continue
+
+          // Calculate distance between particle centers
+          const p1CenterX = p1.x + p1.size / 2
+          const p1CenterY = p1.y + p1.size / 2
+          const p2CenterX = p2.x + p2.size / 2
+          const p2CenterY = p2.y + p2.size / 2
+
+          const dx = p2CenterX - p1CenterX
+          const dy = p2CenterY - p1CenterY
+          const distance = Math.sqrt(dx * dx + dy * dy)
+
+          if (distance < connectionRadius) {
+            // Opacity fades with distance
+            let lineOpacity = (1 - distance / connectionRadius) * 0.4
+
+            // Apply lifecycle opacity to connections
+            if (ANIMATION_CONFIG.lifecycle.enabled) {
+              const getLifecycleOpacity = (p: EnhancedBox): number => {
+                switch (p.lifecycleState) {
+                  case 'spawning': return easeInOutCubic(p.lifecycleProgress)
+                  case 'alive': return 1.0
+                  case 'dying': return 1 - easeInOutCubic(p.lifecycleProgress)
+                  default: return 0
+                }
+              }
+              // Use the minimum opacity of both connected particles
+              const p1Opacity = getLifecycleOpacity(p1)
+              const p2Opacity = getLifecycleOpacity(p2)
+              lineOpacity *= Math.min(p1Opacity, p2Opacity)
+            }
+
+            ctx.beginPath()
+            ctx.moveTo(p1CenterX, p1CenterY)
+            ctx.lineTo(p2CenterX, p2CenterY)
+            ctx.strokeStyle = p1.color
+            ctx.globalAlpha = lineOpacity
+            ctx.stroke()
+          }
+        }
+      }
 
       // Reset global alpha
       ctx.globalAlpha = 1
@@ -313,7 +428,8 @@ export function AnimatedBackground() {
     <>
       <canvas
         ref={canvasRef}
-        className="fixed inset-0 -z-10 pointer-events-none"
+        className="fixed inset-0 z-0 pointer-events-none"
+        style={{ background: 'radial-gradient(circle at 50% 30%, #1e2541 0%, #151929 40%, #0f141f 100%)' }}
         aria-hidden="true"
       />
       {/* Static fallback for reduced motion preference */}

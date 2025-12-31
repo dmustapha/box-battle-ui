@@ -109,7 +109,60 @@ export function createParticle(id: number, depth: DepthLayer): EnhancedBox {
     // Trail properties (optional, currently unused)
     trailPoints: [],
     maxTrailLength: 5,
+
+    // Lifecycle properties (fade in/out)
+    lifecycleState: ANIMATION_CONFIG.lifecycle.enabled ? 'spawning' : 'alive',
+    lifecycleProgress: 0,
+    lifespan: randomInRange(
+      ANIMATION_CONFIG.lifecycle.minLifespan,
+      ANIMATION_CONFIG.lifecycle.maxLifespan
+    ),
+    age: 0,
+    fadeInDuration: ANIMATION_CONFIG.lifecycle.fadeInDuration,
+    fadeOutDuration: ANIMATION_CONFIG.lifecycle.fadeOutDuration,
   }
+}
+
+/**
+ * Respawns an existing particle with new position and lifecycle
+ *
+ * This function is used by the lifecycle system to reset a particle
+ * when it dies (fade-out complete). Reuses the existing particle object
+ * for better performance (object pooling).
+ *
+ * @param particle - Existing particle to respawn
+ * @returns The same particle object with reset properties
+ */
+export function respawnParticle(particle: EnhancedBox): EnhancedBox {
+  const layerConfig = ANIMATION_CONFIG.depthLayers[particle.depth]
+
+  // New random position
+  particle.x = Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920)
+  particle.y = Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080)
+
+  // New random velocity
+  const baseVelocity = ANIMATION_CONFIG.physics.baseSpeed
+  particle.vx = randomInRange(-1, 1) * baseVelocity * layerConfig.speedMultiplier
+  particle.vy = randomInRange(-1, 1) * baseVelocity * layerConfig.speedMultiplier
+
+  // Optionally new color
+  particle.color = selectRandomColor()
+
+  // Reset lifecycle
+  particle.lifecycleState = 'spawning'
+  particle.lifecycleProgress = 0
+  particle.age = 0
+  particle.lifespan = randomInRange(
+    ANIMATION_CONFIG.lifecycle.minLifespan,
+    ANIMATION_CONFIG.lifecycle.maxLifespan
+  )
+
+  // Reset gradient (needs recreation with new color)
+  particle.gradientStops = createGradientStops(particle.color)
+  particle.gradientNeedsUpdate = true
+  particle.cachedGradient = undefined
+
+  return particle
 }
 
 // =============================================================================
