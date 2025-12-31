@@ -1,7 +1,8 @@
 "use client"
 
-import { Volume2, VolumeX, Settings, Wallet, Clock, CheckCircle2, X, ArrowLeft, Music, Gamepad2 } from "lucide-react"
-import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
+import { Volume2, VolumeX, Settings, Wallet, Clock, X, ArrowLeft, Music, Gamepad2 } from "lucide-react"
+import { useAccount, useConnect, useConnectors } from "wagmi"
+import { WalletMenu } from "@/components/wallet-menu"
 import { useState, useRef, useEffect } from "react"
 import { gsap } from "gsap"
 import { animateModalEnter, animateModalExit } from "@/lib/animations"
@@ -19,9 +20,8 @@ interface HeaderProps {
 export default function Header({ timer, onBack, showBackButton, gameMode, onUsernameChange, currentUsername }: HeaderProps) {
   const minutes = Math.floor(timer / 60)
   const seconds = timer % 60
-  const { address, isConnected } = useAccount()
+  const { isConnected } = useAccount()
   const { connect } = useConnect()
-  const { disconnect } = useDisconnect()
   const connectors = useConnectors()
   const [showConnectModal, setShowConnectModal] = useState(false)
 
@@ -132,13 +132,7 @@ export default function Header({ timer, onBack, showBackButton, gameMode, onUser
         <div className="flex items-center gap-3">
           {/* Wallet Button */}
           {isConnected ? (
-            <button
-              onClick={() => disconnect()}
-              className="flex items-center gap-2 px-4 py-2 bg-bg-elevated border border-state-success rounded-lg text-sm font-mono text-state-success hover:bg-bg-panel transition-colors duration-200"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
-            </button>
+            <WalletMenu variant="compact" />
           ) : (
             <button
               onClick={() => setShowConnectModal(true)}
