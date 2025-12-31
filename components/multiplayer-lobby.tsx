@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Copy, Check, AlertCircle, Loader2, Grid3x3, Coins, Users } from "lucide-react"
+import { ArrowLeft, Copy, Check, AlertCircle, Loader2, Grid3x3, Users } from "lucide-react"
 import { useAccount, useSwitchChain } from "wagmi"
 import { mantleSepolia } from "@/lib/wagmi-config"
 
@@ -238,25 +238,6 @@ export default function MultiplayerLobby({
                 </div>
               </div>
 
-              {/* Entry Fee & Prize */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="card border">
-                  <p className="text-sm text-[var(--color-text-tertiary)] mb-2">Entry Fee</p>
-                  <div className="flex items-center gap-2">
-                    <Coins className="w-5 h-5 text-accent-blue" />
-                    <p className="text-2xl font-bold text-accent-blue">0.01 STT</p>
-                  </div>
-                </div>
-
-                <div className="card border">
-                  <p className="text-sm text-[var(--color-text-tertiary)] mb-2">Winner Prize</p>
-                  <div className="flex items-center gap-2">
-                    <Coins className="w-5 h-5 text-accent-amber" />
-                    <p className="text-2xl font-bold text-accent-amber">0.02 STT</p>
-                  </div>
-                </div>
-              </div>
-
               <button
                 onClick={() => {
                   if (!isOnMantleSepolia) {
@@ -284,25 +265,6 @@ export default function MultiplayerLobby({
           <div className="space-y-6">
             <div className="card border">
               <h3 className="text-lg font-bold text-white mb-6">Join Existing Game</h3>
-
-              {/* Entry Fee & Prize */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="card border">
-                  <p className="text-sm text-[var(--color-text-tertiary)] mb-2">Entry Fee</p>
-                  <div className="flex items-center gap-2">
-                    <Coins className="w-5 h-5 text-accent-blue" />
-                    <p className="text-2xl font-bold text-accent-blue">0.01 STT</p>
-                  </div>
-                </div>
-
-                <div className="card border">
-                  <p className="text-sm text-[var(--color-text-tertiary)] mb-2">Winner Prize</p>
-                  <div className="flex items-center gap-2">
-                    <Coins className="w-5 h-5 text-accent-amber" />
-                    <p className="text-2xl font-bold text-accent-amber">0.02 STT</p>
-                  </div>
-                </div>
-              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">

@@ -86,6 +86,14 @@ export default function GamePage() {
   // Ref to track when actively creating a game (prevents event re-processing after cancel)
   const isCreatingGameRef = useRef(false)
 
+  // Ref to track current gamePhase for WebSocket callbacks
+  const gamePhaseRef = useRef<GamePhase>(gamePhase)
+
+  // Keep gamePhaseRef in sync with gamePhase state
+  useEffect(() => {
+    gamePhaseRef.current = gamePhase
+  }, [gamePhase])
+
   // Determine player number (1 for creator, 2 for joiner)
   const playerNum = isJoiningGame ? 2 : (gameId ? 1 : undefined)
 
@@ -150,9 +158,9 @@ export default function GamePage() {
         setOpponentUsername(joinedUsername)
       }
 
-      // If I'm Player 1 and Player 2 just joined, start the game!
+      // If I'm Player 1 and Player 2 just joined, prepare the game (but DON'T start yet!)
       if (playerNum === 1 && joinedPlayerNum === 2 && gamePhase === "lobby") {
-        // Player 2 joined, starting game
+        // Player 2 joined, preparing game state
         // Set my own address as Player 1
         if (address) {
           setPlayer1Address(address)
@@ -161,15 +169,23 @@ export default function GamePage() {
         setDrawnLines(new Set())
         setCompletedBoxes(new Map())
         setScores({ player1: 0, player2: 0 })
-        // Don't set currentPlayer here - wait for WebSocket first-turn message
-        setGamePhase("playing")
+        // Don't set currentPlayer or gamePhase here - wait for WebSocket first-turn message
         refetchGame()
       }
     },
     onPlayerLeft: (leftPlayerNum, leftAddress) => {
-      // Player left game - I win!
-      const myPlayerKey = leftPlayerNum === 1 ? "player2" : "player1"
+      // Check if we're still in lobby phase
+      if (gamePhaseRef.current === "lobby") {
+        // In lobby - just notify and return to mode select (no winner)
+        setTimeout(() => {
+          alert(`Player ${leftPlayerNum} left the lobby. Returning to menu.`)
+          handleReset()
+        }, 100)
+        return
+      }
 
+      // In game - Player left, I win!
+      const myPlayerKey = leftPlayerNum === 1 ? "player2" : "player1"
       setWinner(myPlayerKey)
 
       // Show win message and return to mode selection
@@ -179,16 +195,24 @@ export default function GamePage() {
       }, 100)
     },
     onPlayerQuit: (quitPlayerNum) => {
-      // Opponent quit - I win!
-      const opponentPlayerKey = quitPlayerNum === 1 ? "player1" : "player2"
-      const myPlayerKey = quitPlayerNum === 1 ? "player2" : "player1"
+      // Check if we're still in lobby phase
+      if (gamePhaseRef.current === "lobby") {
+        // In lobby - just notify and return to mode select (no winner)
+        setTimeout(() => {
+          alert(`Player ${quitPlayerNum} cancelled. Returning to menu.`)
+          handleReset()
+        }, 100)
+        return
+      }
 
+      // In game - Opponent quit, I win!
+      const myPlayerKey = quitPlayerNum === 1 ? "player2" : "player1"
       setWinner(myPlayerKey)
-      setGamePhase("mode-select")
 
       // Show win message
       setTimeout(() => {
         alert(`Player ${quitPlayerNum} quit the game. You win!`)
+        handleReset()
       }, 100)
     },
     onPlayAgainRequest: (requesterNum) => {
@@ -208,9 +232,11 @@ export default function GamePage() {
       }
     },
     onFirstTurnReceived: (firstPlayer) => {
-      // Server determined first turn via coin toss
+      // Server determined first turn via coin toss - THIS is when we start playing!
       console.log(`[Game] First turn received from server: ${firstPlayer}`)
       setCurrentPlayer(firstPlayer)
+      // Only transition to playing when we receive first-turn (confirms both players connected)
+      setGamePhase("playing")
     }
   })
 
@@ -324,13 +350,12 @@ export default function GamePage() {
 
     // Use string comparison for BigInt to be safe
     if (gameId && event.gameId.toString() === gameId.toString()) {
-      console.log('[GameStarted] THIS IS MY GAME! Starting now...')
+      console.log('[GameStarted] THIS IS MY GAME! Preparing state...')
       // Reset game state for new multiplayer game
       setDrawnLines(new Set())
       setCompletedBoxes(new Map())
       setScores({ player1: 0, player2: 0 })
-      // Don't set currentPlayer here - wait for WebSocket first-turn message
-      setGamePhase("playing")
+      // Don't set currentPlayer or gamePhase here - wait for WebSocket first-turn message
       refetchGame()
     } else {
       console.log('[GameStarted] Not my game, ignoring. Event:', event.gameId.toString(), 'Mine:', gameId?.toString())
@@ -721,18 +746,15 @@ export default function GamePage() {
   }
 
 
-  // Watch for successful game join - transition to playing after a delay
+  // Watch for successful game join - prepare Player 2's state
   useEffect(() => {
     if (gameJoined && gameId && gameMode === "multiplayer") {
-      // Stay in lobby briefly, then check if we should auto-start
-      setTimeout(() => {
-        setGamePhase("playing")
-        // Set my address as Player 2 again in case it wasn't set
-        if (address) {
-          setPlayer2Address(address)
-        }
-        refetchGame()
-      }, 3000) // Wait 3 seconds for GameStarted event, then force start
+      // Set my address as Player 2
+      if (address) {
+        setPlayer2Address(address)
+      }
+      refetchGame()
+      // Don't set gamePhase here - wait for WebSocket first-turn message
     }
   }, [gameJoined, gameId, gameMode, address])
 
