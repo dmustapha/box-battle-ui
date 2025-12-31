@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bot, Link2, Check, ArrowLeft, Wallet, X, CheckCircle2 } from "lucide-react"
+import { Bot, Link2, Check, ArrowLeft, Wallet, X } from "lucide-react"
 import Link from "next/link"
-import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
+import { useAccount, useConnect, useConnectors } from "wagmi"
+import { WalletMenu } from "@/components/wallet-menu"
 
 interface GameModeSelectorProps {
   onSelectMode: (mode: "ai" | "multiplayer") => void
@@ -13,9 +14,8 @@ interface GameModeSelectorProps {
 
 export default function GameModeSelector({ onSelectMode }: GameModeSelectorProps) {
   const [mounted, setMounted] = useState(false)
-  const { address, isConnected } = useAccount()
+  const { isConnected } = useAccount()
   const { connect } = useConnect()
-  const { disconnect } = useDisconnect()
   const connectors = useConnectors()
   const [showConnectModal, setShowConnectModal] = useState(false)
 
@@ -74,13 +74,7 @@ export default function GameModeSelector({ onSelectMode }: GameModeSelectorProps
 
           {/* Wallet Button */}
           {isConnected ? (
-            <button
-              onClick={() => disconnect()}
-              className="flex items-center gap-2 px-4 py-2 bg-bg-elevated border border-state-success rounded-lg text-sm font-mono text-state-success hover:bg-bg-panel transition-colors"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
-            </button>
+            <WalletMenu variant="default" />
           ) : (
             <button
               onClick={() => setShowConnectModal(true)}
