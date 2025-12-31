@@ -108,12 +108,14 @@ export function WalletMenu({ variant = "default" }: WalletMenuProps) {
           <Link
             href="/profile"
             onClick={handleProfileClick}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-bg-elevated transition-colors group"
+            className="block w-full"
           >
-            <div className="w-8 h-8 bg-accent-blue/10 border border-accent-blue/20 rounded-lg flex items-center justify-center group-hover:bg-accent-blue/20 transition-colors">
-              <User className="w-4 h-4 text-accent-blue" />
+            <div className="flex items-center gap-3 px-4 py-3 text-left hover:bg-bg-elevated transition-colors group">
+              <div className="w-8 h-8 bg-accent-blue/10 border border-accent-blue/20 rounded-lg flex items-center justify-center group-hover:bg-accent-blue/20 transition-colors">
+                <User className="w-4 h-4 text-accent-blue" />
+              </div>
+              <span className="text-sm font-semibold text-white">View Profile</span>
             </div>
-            <p className="text-sm font-semibold text-white">View Profile</p>
           </Link>
 
           {/* Divider */}
