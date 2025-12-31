@@ -162,15 +162,27 @@ export function useJoinGame() {
           functionName: 'joinGame',
           args: [gameId],
           value: entryFee,
-          gas: 500000n, // Explicitly set gas limit to avoid estimation timeout
+          // Let wallet estimate gas - removed hardcoded limit that caused confusing errors
         },
         {
           onSuccess: (txHash) => {
             console.log('[JoinGame Hook] ✅ Transaction sent! Hash:', txHash)
           },
-          onError: (error) => {
+          onError: (error: any) => {
             console.error('[JoinGame Hook] ❌ Transaction error:', error)
-            alert(`❌ Failed to join game: ${error.message}`)
+            // Parse common contract errors
+            const errorMsg = error.message || String(error)
+            if (errorMsg.includes('GameNotWaiting')) {
+              alert('❌ This game is not available to join. It may have already started or ended.')
+            } else if (errorMsg.includes('CannotJoinOwnGame')) {
+              alert('❌ You cannot join your own game!')
+            } else if (errorMsg.includes('WrongEntryFee')) {
+              alert('❌ Wrong entry fee amount.')
+            } else if (errorMsg.includes('intrinsic gas too low') || errorMsg.includes('gas required exceeds')) {
+              alert('❌ Transaction would fail. The game may not exist, already started, or is your own game.')
+            } else {
+              alert(`❌ Failed to join game: ${errorMsg.slice(0, 100)}`)
+            }
           },
         }
       )
@@ -215,15 +227,26 @@ export function usePlaceLine() {
           abi: GAME_CONTRACT_ABI,
           functionName: 'placeLine',
           args: [gameId, row as any, col as any, directionNum as any],
-          gas: 500000n, // Explicitly set gas limit to avoid estimation timeout
+          // Let wallet estimate gas
         },
         {
           onSuccess: (txHash) => {
             console.log('[PlaceLine] ✅ Transaction sent! Hash:', txHash)
           },
-          onError: (error) => {
+          onError: (error: any) => {
             console.error('[PlaceLine] ❌ Transaction error:', error)
-            alert(`❌ Failed to place line: ${error.message}`)
+            const errorMsg = error.message || String(error)
+            if (errorMsg.includes('NotYourTurn')) {
+              alert('❌ Not your turn!')
+            } else if (errorMsg.includes('LineAlreadyDrawn')) {
+              alert('❌ This line is already drawn!')
+            } else if (errorMsg.includes('GameNotActive')) {
+              alert('❌ Game is not active.')
+            } else if (errorMsg.includes('InvalidLine')) {
+              alert('❌ Invalid line position.')
+            } else {
+              alert(`❌ Failed to place line: ${errorMsg.slice(0, 100)}`)
+            }
           },
         }
       )
