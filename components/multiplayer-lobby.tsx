@@ -74,9 +74,17 @@ export default function MultiplayerLobby({
           <p className="text-[var(--color-text-secondary)] text-lg mb-4">
             Waiting for game to start...
           </p>
-          <p className="text-sm text-[var(--color-text-tertiary)]">
+          <p className="text-sm text-[var(--color-text-tertiary)] mb-6">
             The game will begin shortly
           </p>
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="text-[var(--color-text-tertiary)] hover:text-white transition-colors text-sm"
+            >
+              Cancel and go back
+            </button>
+          )}
         </div>
       </div>
     )

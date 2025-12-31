@@ -81,7 +81,7 @@ export default function GamePage() {
   const [player2Address, setPlayer2Address] = useState<string>("")
   const { data: gameState, refetch: refetchGame } = useGameState(gameId)
   const { createGame, hash: createTxHash } = useCreateGame()
-  const { joinGame, isSuccess: gameJoined, isPending: isJoinPending, hash: joinTxHash } = useJoinGame()
+  const { joinGame, isSuccess: gameJoined, isPending: isJoinPending, isError: isJoinError, hash: joinTxHash } = useJoinGame()
 
   // Ref to track when actively creating a game (prevents event re-processing after cancel)
   const isCreatingGameRef = useRef(false)
@@ -757,6 +757,17 @@ export default function GamePage() {
       // Don't set gamePhase here - wait for WebSocket first-turn message
     }
   }, [gameJoined, gameId, gameMode, address])
+
+  // Watch for join errors - reset state if transaction fails/rejected
+  useEffect(() => {
+    if (isJoinError && isJoiningGame) {
+      console.log('[Game] Join transaction failed, resetting state')
+      setIsJoiningGame(false)
+      setGameId(undefined)
+      setPlayer2Address("")
+      // Stay in lobby phase so user can try again
+    }
+  }, [isJoinError, isJoiningGame])
 
   const handleBack = () => {
     // Show confirmation for multiplayer or in-progress games
