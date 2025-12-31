@@ -43,7 +43,7 @@ export const ANIMATION_CONFIG: AnimationConfig = {
     /**
      * Particle count on desktop devices
      */
-    desktop: 30,
+    desktop: 25,
   },
 
   // ---------------------------------------------------------------------------

@@ -109,9 +109,9 @@ export function AnimatedBackground() {
       const { x, y, size, color, depth, rotation, scale } = box
       const borderRadius = 6 // Rounded corners
 
-      // Phase 2: Layer-specific blur for depth perception
+      // Phase 2: Layer-specific blur for depth perception with enhanced glow
       const layerBlur = ANIMATION_CONFIG.depthLayers[depth].blurAmount
-      ctx.shadowBlur = layerBlur
+      ctx.shadowBlur = layerBlur * 1.2  // Subtle glow
       ctx.shadowColor = color
 
       // Phase 3: Apply rotation and scaling transforms
@@ -151,10 +151,10 @@ export function AnimatedBackground() {
       // Reset shadow for border
       ctx.shadowBlur = 0
 
-      // Draw border (optional, subtle)
+      // Draw border with sharper definition (Volume 5 spec: borderAlpha 0.9)
       ctx.strokeStyle = color
       ctx.lineWidth = 1.5
-      ctx.globalAlpha = opacity * 0.4  // More subtle border for glass effect
+      ctx.globalAlpha = opacity * 0.5  // Balanced border visibility
       ctx.beginPath()
       ctx.roundRect(x, y, size, size, borderRadius)
       ctx.stroke()
@@ -357,8 +357,8 @@ export function AnimatedBackground() {
           const distance = Math.sqrt(dx * dx + dy * dy)
 
           if (distance < connectionRadius) {
-            // Opacity fades with distance
-            let lineOpacity = (1 - distance / connectionRadius) * 0.4
+            // Opacity fades with distance (increased visibility)
+            let lineOpacity = (1 - distance / connectionRadius) * 0.5
 
             // Apply lifecycle opacity to connections
             if (ANIMATION_CONFIG.lifecycle.enabled) {

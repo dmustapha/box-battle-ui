@@ -248,23 +248,23 @@ export function rgbaString(
  */
 export function createGradientStops(baseColor: string): GradientStop[] {
   return [
-    // Center: Bright and vibrant
+    // Center: Bright but not overpowering
     {
       offset: 0,
       color: baseColor,
-      alpha: 0.8,  // High opacity at center
+      alpha: 0.85,  // Slightly reduced center brightness
     },
-    // Mid-point: Transition
+    // Mid-point: Gradual transition
     {
-      offset: 0.6,
+      offset: 0.55,
       color: baseColor,
-      alpha: 0.4,  // Medium opacity
+      alpha: 0.4,  // Softer mid-point
     },
-    // Edge: Nearly transparent
+    // Edge: Subtle fade
     {
       offset: 1.0,
       color: baseColor,
-      alpha: 0.05,  // Almost invisible at edge
+      alpha: 0.1,  // Gentle edge
     },
   ]
 }
