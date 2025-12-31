@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Copy, Check, AlertCircle, Loader2, Grid3x3, Coins, Users } from "lucide-react"
 import { useAccount, useSwitchChain } from "wagmi"
-import { somniaTestnet } from "@/lib/wagmi-config"
+import { mantleSepolia } from "@/lib/wagmi-config"
 
 interface MultiplayerLobbyProps {
   onJoinGame: (gameId: bigint) => void
@@ -38,10 +38,10 @@ export default function MultiplayerLobby({
   const { chain } = useAccount()
   const { switchChain } = useSwitchChain()
 
-  const isOnSomniaTestnet = chain?.id === somniaTestnet.id
+  const isOnMantleSepolia = chain?.id === mantleSepolia.id
 
   const handleSwitchNetwork = () => {
-    switchChain({ chainId: somniaTestnet.id })
+    switchChain({ chainId: mantleSepolia.id })
   }
 
   const handleCopyGameId = () => {
@@ -65,7 +65,7 @@ export default function MultiplayerLobby({
   // Show waiting screen for Player 2 (joining)
   if (isJoining && createdGameId !== undefined) {
     return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6">
+      <div className="min-h-screen bg-transparent relative z-10 flex items-center justify-center p-6">
         <div className="text-center max-w-md w-full">
           <Loader2 className="w-16 h-16 mx-auto mb-6 text-accent-blue animate-spin" />
           <h2 className="text-3xl font-bold text-white mb-4">
@@ -85,7 +85,7 @@ export default function MultiplayerLobby({
   // Show waiting screen for Player 1 (created game)
   if (isWaitingForOpponent && createdGameId !== undefined && !isJoining) {
     return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center p-6">
+      <div className="min-h-screen bg-transparent relative z-10 flex items-center justify-center p-6">
         <div className="text-center max-w-md w-full">
           <Loader2 className="w-16 h-16 mx-auto mb-6 text-accent-blue animate-spin" />
           <h2 className="text-3xl font-bold text-white mb-6">
@@ -143,24 +143,24 @@ export default function MultiplayerLobby({
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary p-6">
+    <div className="min-h-screen bg-transparent relative z-10 p-6">
       <div className="max-w-2xl mx-auto">
         {/* Network Warning */}
-        {!isOnSomniaTestnet && (
+        {!isOnMantleSepolia && (
           <div className="mb-6 card border-2 border-state-error">
             <div className="flex items-center gap-3 mb-4">
               <AlertCircle className="w-6 h-6 text-state-error flex-shrink-0" />
               <h3 className="text-xl font-bold text-state-error">Wrong Network!</h3>
             </div>
             <p className="text-[var(--color-text-secondary)] mb-4">
-              You're currently on <strong>{chain?.name || "Unknown Network"}</strong>. You must switch to <strong>Somnia Testnet</strong> to play multiplayer.
+              You're currently on <strong>{chain?.name || "Unknown Network"}</strong>. You must switch to <strong>Mantle Sepolia</strong> to play multiplayer.
             </p>
             <button
               onClick={handleSwitchNetwork}
               className="button-primary w-full bg-state-error"
               style={{ backgroundColor: 'var(--color-error)' }}
             >
-              Switch to Somnia Testnet
+              Switch to Mantle Sepolia
             </button>
           </div>
         )}
@@ -259,14 +259,14 @@ export default function MultiplayerLobby({
 
               <button
                 onClick={() => {
-                  if (!isOnSomniaTestnet) {
-                    alert('⚠️ Please switch to Somnia Testnet first!')
+                  if (!isOnMantleSepolia) {
+                    alert('⚠️ Please switch to Mantle Sepolia first!')
                     return
                   }
                   // Creating game
                   onCreateGame()
                 }}
-                disabled={!isOnSomniaTestnet}
+                disabled={!isOnMantleSepolia}
                 className="button-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Game & Wait for Opponent
@@ -318,13 +318,13 @@ export default function MultiplayerLobby({
                   />
                   <Button
                     onClick={() => {
-                      if (!isOnSomniaTestnet) {
-                        alert('⚠️ Please switch to Somnia Testnet first!')
+                      if (!isOnMantleSepolia) {
+                        alert('⚠️ Please switch to Mantle Sepolia first!')
                         return
                       }
                       handleJoinGame()
                     }}
-                    disabled={!gameIdInput || !isOnSomniaTestnet || isJoinPending}
+                    disabled={!gameIdInput || !isOnMantleSepolia || isJoinPending}
                     className="button-primary min-w-[120px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isJoinPending ? (

@@ -2,27 +2,27 @@ import { http, createConfig } from 'wagmi'
 import { defineChain } from 'viem'
 import { injected, walletConnect, coinbaseWallet, metaMask } from 'wagmi/connectors'
 
-// Define Somnia Testnet chain
-export const somniaTestnet = defineChain({
-  id: 50312,
-  name: 'Somnia Testnet',
+// Define Mantle Sepolia Testnet chain
+export const mantleSepolia = defineChain({
+  id: 5003,
+  name: 'Mantle Sepolia Testnet',
   nativeCurrency: {
     decimals: 18,
-    name: 'STT',
-    symbol: 'STT',
+    name: 'MNT',
+    symbol: 'MNT',
   },
   rpcUrls: {
     default: {
-      http: ['https://dream-rpc.somnia.network'],
+      http: ['https://rpc.sepolia.mantle.xyz'],
     },
     public: {
-      http: ['https://dream-rpc.somnia.network'],
+      http: ['https://rpc.sepolia.mantle.xyz'],
     },
   },
   blockExplorers: {
     default: {
-      name: 'Somnia Explorer',
-      url: 'https://shannon-explorer.somnia.network',
+      name: 'Mantle Sepolia Explorer',
+      url: 'https://explorer.sepolia.mantle.xyz',
     },
   },
   testnet: true,
@@ -113,15 +113,15 @@ if (wcProjectId && wcProjectId !== 'YOUR_PROJECT_ID') {
 }
 
 export const config = createConfig({
-  chains: [somniaTestnet],
+  chains: [mantleSepolia],
   connectors,
   transports: {
-    [somniaTestnet.id]: http('https://dream-rpc.somnia.network', {
-      timeout: 60000, // 60 second timeout (Somnia RPC can be slow)
-      retryCount: 5,   // More retries
-      retryDelay: 2000, // Wait 2s between retries
+    [mantleSepolia.id]: http('https://rpc.sepolia.mantle.xyz', {
+      timeout: 60000,
+      retryCount: 5,
+      retryDelay: 2000,
     }),
   },
 })
 
-export const GAME_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_GAME_CONTRACT || '0xDB3CB1af42f41d91e06DeABA286b0918A3422dFe') as `0x${string}`
+export const GAME_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_GAME_CONTRACT || '0xf2943580DABc1dd5eD417a5DC58D35110640BB2f') as `0x${string}`

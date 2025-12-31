@@ -1,15 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { Wallet, X, CheckCircle2 } from "lucide-react"
-import { useAccount, useConnect, useDisconnect, useConnectors } from "wagmi"
+import { Wallet, X } from "lucide-react"
+import { useAccount, useConnect, useConnectors } from "wagmi"
 import { useState, useRef, useEffect } from "react"
 import { animateModalEnter, animateModalExit } from "@/lib/animations"
+import { WalletMenu } from "@/components/wallet-menu"
 
 export default function Navigation() {
-  const { address, isConnected } = useAccount()
+  const { isConnected } = useAccount()
   const { connect } = useConnect()
-  const { disconnect } = useDisconnect()
   const connectors = useConnectors()
   const [showConnectModal, setShowConnectModal] = useState(false)
 
@@ -68,15 +68,9 @@ export default function Navigation() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Wallet Button */}
+          {/* Wallet Menu or Connect Button */}
           {isConnected ? (
-            <button
-              onClick={() => disconnect()}
-              className="px-4 py-2 rounded-lg bg-bg-elevated border border-state-success font-mono text-sm text-state-success font-semibold flex items-center gap-2 hover:bg-bg-panel transition-all"
-            >
-              <CheckCircle2 size={16} />
-              {address?.slice(0, 6)}...{address?.slice(-4)}
-            </button>
+            <WalletMenu variant="default" />
           ) : (
             <button
               onClick={() => setShowConnectModal(true)}

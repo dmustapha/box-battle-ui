@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useAccount } from "wagmi"
 import { Trophy, Clock, Zap } from "lucide-react"
 import Header from "@/components/header"
@@ -82,6 +82,9 @@ export default function GamePage() {
   const { data: gameState, refetch: refetchGame } = useGameState(gameId)
   const { createGame, hash: createTxHash } = useCreateGame()
   const { joinGame, isSuccess: gameJoined, isPending: isJoinPending, hash: joinTxHash } = useJoinGame()
+
+  // Ref to track when actively creating a game (prevents event re-processing after cancel)
+  const isCreatingGameRef = useRef(false)
 
   // Determine player number (1 for creator, 2 for joiner)
   const playerNum = isJoiningGame ? 2 : (gameId ? 1 : undefined)
@@ -223,6 +226,9 @@ export default function GamePage() {
 
   // Extract gameId from transaction receipt OR use counter fallback
   useEffect(() => {
+    // Skip if we're not actively creating a game (user may have cancelled)
+    if (!isCreatingGameRef.current) return
+
     // If receipt parsing succeeds, use it
     if (isTxConfirmed && txReceipt && !gameId) {
       // GameCreated event signature hash
@@ -252,7 +258,8 @@ export default function GamePage() {
     if (createTxHash && !gameId && !isTxPending && !isTxConfirmed && gameCounter) {
       // Wait a bit to ensure transaction is mined
       setTimeout(() => {
-        if (!gameId) { // Double check we haven't gotten it another way
+        // Also check ref inside timer to prevent late execution after cancel
+        if (!gameId && isCreatingGameRef.current) {
           setGameId(gameCounter)
           setGamePhase("lobby")
         }
@@ -285,6 +292,12 @@ export default function GamePage() {
 
   // Watch blockchain events
   useWatchGameCreated((event) => {
+    // Ignore events if we're not actively creating a game (prevents re-processing after cancel)
+    if (!isCreatingGameRef.current) {
+      console.log('[GameCreated] Ignoring event - not actively creating a game')
+      return
+    }
+
     console.log('[GameCreated Event]', event)
     console.log('[GameCreated] Player1:', event.player1)
     console.log('[GameCreated] Current address:', address)
@@ -687,6 +700,7 @@ export default function GamePage() {
 
   const handleCreateGame = () => {
     // Creating game
+    isCreatingGameRef.current = true
     // Set my address as Player 1
     if (address) {
       setPlayer1Address(address)
@@ -743,6 +757,8 @@ export default function GamePage() {
   }
 
   const handleReset = () => {
+    // Reset the creating game flag to prevent event re-processing
+    isCreatingGameRef.current = false
     setScores({ player1: 0, player2: 0 })
     setWinner(null)
     setMoveHistory([])

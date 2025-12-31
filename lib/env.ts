@@ -4,8 +4,8 @@
  */
 
 export const ENV = {
-  // Smart Contract Address
-  GAME_CONTRACT_ADDRESS: (process.env.NEXT_PUBLIC_GAME_CONTRACT || '0xDB3CB1af42f41d91e06DeABA286b0918A3422dFe') as `0x${string}`,
+  // Smart Contract Address (Mantle Sepolia)
+  GAME_CONTRACT_ADDRESS: (process.env.NEXT_PUBLIC_GAME_CONTRACT || '0xf2943580DABc1dd5eD417a5DC58D35110640BB2f') as `0x${string}`,
 
   // WebSocket URL - auto-detect based on environment
   WS_URL: process.env.NEXT_PUBLIC_WS_URL || (
@@ -17,8 +17,8 @@ export const ENV = {
   ),
 
   // Network Configuration
-  CHAIN_ID: 50312, // Somnia Testnet
-  RPC_URL: 'https://dream-rpc.somnia.network',
+  CHAIN_ID: 5003, // Mantle Sepolia Testnet
+  RPC_URL: 'https://rpc.sepolia.mantle.xyz',
 
   // Feature Flags
   ENABLE_SOUND: true,

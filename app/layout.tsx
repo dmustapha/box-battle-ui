@@ -23,7 +23,7 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: "BoxBattle ⚡ - Web3 Strategy Game",
   description:
-    "Experience the ultimate competitive Dots and Boxes game with real-time multiplayer and blockchain rewards on Somnia Testnet",
+    "Experience the ultimate competitive Dots and Boxes game with real-time multiplayer and blockchain rewards on Mantle Sepolia",
   generator: "v0.app",
   icons: {
     icon: '/boxbattle-logo.svg',

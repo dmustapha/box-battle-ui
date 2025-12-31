@@ -37,7 +37,7 @@ export default function UsernameSetup({ onSubmit, address }: UsernameSetupProps)
   const isValid = username.trim().length >= 3 && username.trim().length <= 20 && /^[a-zA-Z0-9_]+$/.test(username)
 
   return (
-    <div className="min-h-screen bg-bg-primary p-6 flex items-center justify-center">
+    <div className="min-h-screen bg-transparent relative z-10 p-6 flex items-center justify-center">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
