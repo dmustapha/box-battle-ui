@@ -7,7 +7,7 @@ import { animateLinePlacement, animateBoxCompletion } from "@/lib/animations"
 interface GameBoardProps {
   currentPlayer: "player1" | "player2"
   onLineClick: (lineId: string) => void
-  drawnLines: Set<string>
+  drawnLines: Map<string, "player1" | "player2">  // Changed from Set to Map to track who drew each line
   completedBoxes: Map<string, "player1" | "player2">
   gridSize?: 3 | 4 | 5 | 6
 }
@@ -25,7 +25,7 @@ export default function GameBoard({
 }: GameBoardProps) {
   const [hoveredLine, setHoveredLine] = useState<string | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
-  const prevDrawnLinesRef = useRef(new Set<string>())
+  const prevDrawnLinesRef = useRef(new Map<string, "player1" | "player2">())
   const prevCompletedBoxesRef = useRef(new Map<string, "player1" | "player2">())
 
   const padding = 40
@@ -40,7 +40,7 @@ export default function GameBoard({
 
   // Animate new lines
   useEffect(() => {
-    const newLines = Array.from(drawnLines).filter(
+    const newLines = Array.from(drawnLines.keys()).filter(
       (lineId) => !prevDrawnLinesRef.current.has(lineId)
     )
 
@@ -51,7 +51,7 @@ export default function GameBoard({
       }
     })
 
-    prevDrawnLinesRef.current = new Set(drawnLines)
+    prevDrawnLinesRef.current = new Map(drawnLines)
   }, [drawnLines])
 
   // Animate new boxes
@@ -175,9 +175,13 @@ export default function GameBoard({
 
         {/* Draw lines */}
         {lines.map((line) => {
-          const isDrawn = drawnLines.has(line.id)
+          const lineOwner = drawnLines.get(line.id)
+          const isDrawn = lineOwner !== undefined
           const isHovered = hoveredLine === line.id && !isDrawn
-          const playerColor = currentPlayer === "player1" ? '#3B82F6' : '#EF4444'
+          // For hover preview, use current player's color
+          const hoverColor = currentPlayer === "player1" ? '#3B82F6' : '#EF4444'
+          // For drawn lines, use the line owner's color (who actually drew it)
+          const drawnColor = lineOwner === "player1" ? '#3B82F6' : '#EF4444'
 
           return (
             <g key={line.id}>
@@ -202,13 +206,13 @@ export default function GameBoard({
                   y1={line.y1}
                   x2={line.x2}
                   y2={line.y2}
-                  stroke={isHovered ? playerColor : '#94A3B8'}
+                  stroke={isHovered ? hoverColor : '#94A3B8'}
                   strokeWidth={isHovered ? 5 : 2.5}
                   opacity={isHovered ? 1 : 0.7}
                   strokeDasharray={isHovered ? "0" : "10,10"}
                   style={{
                     transition: 'all 0.2s ease',
-                    filter: isHovered ? `drop-shadow(0 0 16px ${playerColor})` : undefined,
+                    filter: isHovered ? `drop-shadow(0 0 16px ${hoverColor})` : undefined,
                   }}
                 />
               )}
@@ -221,7 +225,7 @@ export default function GameBoard({
                   y1={line.y1}
                   x2={line.x2}
                   y2={line.y2}
-                  stroke={playerColor}
+                  stroke={drawnColor}
                   strokeWidth={LINE_WIDTH}
                   strokeLinecap="round"
                 />

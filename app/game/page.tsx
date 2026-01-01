@@ -66,9 +66,9 @@ export default function GamePage() {
   const [timer, setTimer] = useState(getTimerForGridSize(gridSize))
   const [difficulty, setDifficulty] = useState<Difficulty>("medium")
   const [aiPlayer, setAiPlayer] = useState<AIPlayer | null>(null)
-  const [drawnLines, setDrawnLines] = useState<Set<string>>(new Set())
+  const [drawnLines, setDrawnLines] = useState<Map<string, "player1" | "player2">>(new Map())
   // Ref for synchronous guard checks (state updates are async, ref updates are sync)
-  const drawnLinesRef = useRef<Set<string>>(new Set())
+  const drawnLinesRef = useRef<Map<string, "player1" | "player2">>(new Map())
   const [completedBoxes, setCompletedBoxes] = useState<Map<string, "player1" | "player2">>(new Map())
   const [isProcessingMove, setIsProcessingMove] = useState(false)
   const [totalBoxes, setTotalBoxes] = useState((gridSize - 1) * (gridSize - 1))
@@ -136,17 +136,17 @@ export default function GamePage() {
     onOpponentMove: (lineId, opponentPlayerNum) => {
       // Opponent move received
 
-      // Update ref IMMEDIATELY (sync) to prevent race conditions
-      drawnLinesRef.current.add(lineId)
+      // Determine opponent's player key
+      const opponentPlayer: "player1" | "player2" = opponentPlayerNum === 1 ? 'player1' : 'player2'
 
-      // Create new lines set for state
-      const updated = new Set(drawnLinesRef.current)
+      // Update ref IMMEDIATELY (sync) to prevent race conditions
+      drawnLinesRef.current.set(lineId, opponentPlayer)
+
+      // Create new lines map for state
+      const updated = new Map(drawnLinesRef.current)
 
       // Update state
       setDrawnLines(updated)
-
-      // Determine opponent's player key
-      const opponentPlayer: "player1" | "player2" = opponentPlayerNum === 1 ? 'player1' : 'player2'
 
       // Check if opponent completed a box with this move (pass player explicitly to avoid stale closure)
       const { newBoxes, count: boxesCompleted } = checkBoxCompletion(lineId, updated, opponentPlayer)
@@ -189,8 +189,8 @@ export default function GamePage() {
           setPlayer1Address(address)
         }
         setPlayer2Address(joinedAddress)
-        drawnLinesRef.current = new Set()
-        setDrawnLines(new Set())
+        drawnLinesRef.current = new Map()
+        setDrawnLines(new Map())
         setCompletedBoxes(new Map())
         setScores({ player1: 0, player2: 0 })
         // Don't set currentPlayer or gamePhase here - wait for WebSocket first-turn message
@@ -379,8 +379,8 @@ export default function GamePage() {
 
       console.log('[GameStarted] THIS IS MY GAME! Preparing state...')
       // Reset game state for new multiplayer game
-      drawnLinesRef.current = new Set()
-      setDrawnLines(new Set())
+      drawnLinesRef.current = new Map()
+      setDrawnLines(new Map())
       setCompletedBoxes(new Map())
       setScores({ player1: 0, player2: 0 })
       // Don't set currentPlayer or gamePhase here - wait for WebSocket first-turn message
@@ -402,7 +402,7 @@ export default function GamePage() {
   // DO NOT add a useEffect here to recalculate scores - it causes duplicate counting!
 
   // Box completion check
-  const isBoxComplete = useCallback((boxRow: number, boxCol: number, testLines: Set<string>): boolean => {
+  const isBoxComplete = useCallback((boxRow: number, boxCol: number, testLines: Map<string, "player1" | "player2">): boolean => {
     const top = `h-${boxRow}-${boxCol}-${boxRow}-${boxCol + 1}`
     const bottom = `h-${boxRow + 1}-${boxCol}-${boxRow + 1}-${boxCol + 1}`
     const left = `v-${boxRow}-${boxCol}-${boxRow + 1}-${boxCol}`
@@ -412,7 +412,7 @@ export default function GamePage() {
   }, [])
 
   const checkBoxCompletion = useCallback(
-    (lineId: string, testLines: Set<string>, player: "player1" | "player2"): { newBoxes: Map<string, "player1" | "player2">; count: number } => {
+    (lineId: string, testLines: Map<string, "player1" | "player2">, player: "player1" | "player2"): { newBoxes: Map<string, "player1" | "player2">; count: number } => {
       const newBoxes = new Map(completedBoxes)
       let completedCount = 0
 
@@ -457,10 +457,10 @@ export default function GamePage() {
     }
 
     // Update ref IMMEDIATELY (sync) to prevent race conditions
-    drawnLinesRef.current.add(aiMove.lineId)
+    drawnLinesRef.current.set(aiMove.lineId, "player2")
 
-    // Create new lines set for state
-    const newDrawnLines = new Set(drawnLinesRef.current)
+    // Create new lines map for state
+    const newDrawnLines = new Map(drawnLinesRef.current)
 
     // Update drawn lines state
     setDrawnLines(newDrawnLines)
@@ -656,10 +656,10 @@ export default function GamePage() {
         playLineClick()
 
         // Update ref IMMEDIATELY (sync) to prevent duplicate clicks
-        drawnLinesRef.current.add(lineId)
+        drawnLinesRef.current.set(lineId, currentPlayer)
 
-        // Create new lines set with this line added for state
-        const newDrawnLines = new Set(drawnLinesRef.current)
+        // Create new lines map with this line added for state
+        const newDrawnLines = new Map(drawnLinesRef.current)
 
         // Update drawn lines state (async)
         setDrawnLines(newDrawnLines)
@@ -696,10 +696,10 @@ export default function GamePage() {
       playLineClick()
 
       // Update ref IMMEDIATELY (sync) to prevent duplicate clicks
-      drawnLinesRef.current.add(lineId)
+      drawnLinesRef.current.set(lineId, "player1")
 
-      // Create new lines set for state
-      const newDrawnLines = new Set(drawnLinesRef.current)
+      // Create new lines map for state
+      const newDrawnLines = new Map(drawnLinesRef.current)
 
       // Update drawn lines state (async)
       setDrawnLines(newDrawnLines)
@@ -854,8 +854,8 @@ export default function GamePage() {
     setMoveHistory([])
     setCurrentPlayer("player1")
     setTimer(getTimerForGridSize(gridSize))
-    drawnLinesRef.current = new Set()
-    setDrawnLines(new Set())
+    drawnLinesRef.current = new Map()
+    setDrawnLines(new Map())
     setCompletedBoxes(new Map())
     setGamePhase("mode-select")
     setGameMode(null)
@@ -874,8 +874,8 @@ export default function GamePage() {
     setMoveHistory([])
     setCurrentPlayer("player1")
     setTimer(getTimerForGridSize(gridSize))
-    drawnLinesRef.current = new Set()
-    setDrawnLines(new Set())
+    drawnLinesRef.current = new Map()
+    setDrawnLines(new Map())
     setCompletedBoxes(new Map())
     // Keep gameMode, difficulty, aiPlayer, and gridSize
   }
@@ -887,8 +887,8 @@ export default function GamePage() {
     setMoveHistory([])
     // Don't set currentPlayer here - server will send new first-turn via WebSocket
     setTimer(getTimerForGridSize(gridSize))
-    drawnLinesRef.current = new Set()
-    setDrawnLines(new Set())
+    drawnLinesRef.current = new Map()
+    setDrawnLines(new Map())
     setCompletedBoxes(new Map())
     setShowPlayAgainPrompt(false)
     setPlayAgainRequesterNum(null)

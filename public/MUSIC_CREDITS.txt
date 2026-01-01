@@ -1,0 +1,9 @@
+BoxBattle Music Credits
+========================
+
+Background Music: "Happy Arcade Tune"
+Artist: rezoner
+Source: https://opengameart.org/content/happy-arcade-tune
+License: CC-BY 3.0 (Creative Commons Attribution 3.0)
+
+Attribution: Music by rezoner (opengameart.org)

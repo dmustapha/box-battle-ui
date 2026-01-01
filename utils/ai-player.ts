@@ -26,7 +26,7 @@ export class AIPlayer {
   /**
    * Get all available lines on the game board
    */
-  private getAvailableLines(drawnLines: Set<string>, gridSize = 5): string[] {
+  private getAvailableLines(drawnLines: Map<string, "player1" | "player2">, gridSize = 5): string[] {
     const lines: string[] = []
 
     // Horizontal lines: row 0 to gridSize (inclusive), col 0 to gridSize-1
@@ -55,7 +55,7 @@ export class AIPlayer {
   /**
    * Count how many sides of a box are already drawn
    */
-  private countBoxSides(row: number, col: number, testLines: Set<string>): number {
+  private countBoxSides(row: number, col: number, testLines: Map<string, "player1" | "player2">): number {
     const top = `h-${row}-${col}-${row}-${col + 1}`
     const bottom = `h-${row + 1}-${col}-${row + 1}-${col + 1}`
     const left = `v-${row}-${col}-${row + 1}-${col}`
@@ -74,9 +74,9 @@ export class AIPlayer {
    * Evaluate a move and return score
    * Higher score = better move
    */
-  private evaluateMove(lineId: string, drawnLines: Set<string>, gridSize = 4): number {
-    const testLines = new Set(drawnLines)
-    testLines.add(lineId)
+  private evaluateMove(lineId: string, drawnLines: Map<string, "player1" | "player2">, gridSize = 4): number {
+    const testLines = new Map(drawnLines)
+    testLines.set(lineId, "player2") // AI is always player2
 
     let score = 0
 
@@ -112,7 +112,7 @@ export class AIPlayer {
   /**
    * Make a move based on difficulty level
    */
-  makeMove(drawnLines: Set<string>, gridSize = 4): AIMove {
+  makeMove(drawnLines: Map<string, "player1" | "player2">, gridSize = 4): AIMove {
     const availableLines = this.getAvailableLines(drawnLines, gridSize)
 
     if (availableLines.length === 0) {
