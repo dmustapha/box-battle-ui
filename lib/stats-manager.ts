@@ -549,11 +549,11 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
      * Usage: DEBUG_STATS.list()
      */
     list: () => {
-      const keys = Object.keys(localStorage).filter(key => key.startsWith('stats_'))
+      const keys = Object.keys(localStorage).filter(key => key.startsWith('boxbattle_stats_'))
       console.log('=== ALL STATS KEYS ===')
       console.log('Found', keys.length, 'stats entries')
       keys.forEach((key, index) => {
-        const address = key.replace('stats_', '')
+        const address = key.replace('boxbattle_stats_', '')
         try {
           const stats = loadStatsFromStorage(address)
           if (stats) {
@@ -613,6 +613,24 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     },
 
     /**
+     * Clear ALL player stats from localStorage
+     * Usage: DEBUG_STATS.clearAll()
+     */
+    clearAll: () => {
+      const keys = Object.keys(localStorage).filter(key => key.startsWith('boxbattle_stats_'))
+      console.log('=== CLEARING ALL STATS ===')
+      console.log('Found', keys.length, 'stats entries to clear')
+
+      keys.forEach(key => {
+        localStorage.removeItem(key)
+        console.log('Removed:', key)
+      })
+
+      console.log('✅ All player stats cleared!')
+      return keys.length
+    },
+
+    /**
      * Help - show available commands
      * Usage: DEBUG_STATS.help()
      */
@@ -620,6 +638,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       console.log('=== DEBUG_STATS COMMANDS ===')
       console.log('DEBUG_STATS.view(address) - View stats for an address')
       console.log('DEBUG_STATS.clear(address) - Clear stats for an address')
+      console.log('DEBUG_STATS.clearAll() - Clear ALL player stats')
       console.log('DEBUG_STATS.list() - List all stored stats')
       console.log('DEBUG_STATS.export(address) - Export stats as JSON')
       console.log('DEBUG_STATS.storage() - Check localStorage usage')

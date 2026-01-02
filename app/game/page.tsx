@@ -289,6 +289,7 @@ export default function GamePage() {
         const gameIdHex = gameCreatedLog.topics[1]
         const extractedGameId = BigInt(gameIdHex)
 
+        console.log('[Game] Extracted gameId from receipt:', extractedGameId.toString())
         setGameId(extractedGameId)
         setIsCreatingGame(false)
         setGamePhase("lobby")
@@ -303,6 +304,7 @@ export default function GamePage() {
       setTimeout(() => {
         // Also check ref inside timer to prevent late execution after cancel
         if (!gameId && isCreatingGameRef.current) {
+          console.log('[Game] Using gameCounter fallback:', gameCounter.toString())
           setGameId(gameCounter)
           setIsCreatingGame(false)
           setGamePhase("lobby")
@@ -310,6 +312,23 @@ export default function GamePage() {
       }, 3000)
     }
   }, [isTxConfirmed, isTxError, isTxPending, txReceipt, gameId, createTxHash, gameCounter])
+
+  // Timeout fallback: If stuck creating for too long, use game counter
+  useEffect(() => {
+    if (!isCreatingGame || !createTxHash || gameId) return
+
+    const timeoutId = setTimeout(() => {
+      // If still creating after 15 seconds, try to use game counter
+      if (isCreatingGameRef.current && !gameId && gameCounter) {
+        console.log('[Game] Timeout fallback - using gameCounter:', gameCounter.toString())
+        setGameId(gameCounter)
+        setIsCreatingGame(false)
+        setGamePhase("lobby")
+      }
+    }, 15000) // 15 second timeout
+
+    return () => clearTimeout(timeoutId)
+  }, [isCreatingGame, createTxHash, gameId, gameCounter])
 
   // Check for existing username on mount
   useEffect(() => {
